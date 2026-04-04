@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, CheckCircle, MessageSquare, Bus, Phone } from 'lucide-react';
-import type { BookingData } from './BookingForm';
+import { X, Bus } from 'lucide-react';
+import type { BookingData } from '../booking/BookingForm';
 import { STOPS } from '../../data/routes';
-import SuccessScreen from '../payment/SuccessScreen';
+import SuccessScreen from './SuccessScreen';
 
 interface PaymentModalProps {
   data: BookingData;
@@ -14,7 +14,7 @@ type PayStep = 'choose' | 'processing' | 'success';
 
 export default function PaymentModal({ data, onClose }: PaymentModalProps) {
   const [step, setStep] = useState<PayStep>('choose');
-  const [method, setMethod] = useState<'applepay' | 'googlepay' | 'card' | null>(null);
+  const [, setMethod] = useState<'applepay' | 'googlepay' | 'card' | null>(null);
 
   const fromStop = STOPS.find(s => s.id === data.from);
   const toStop = STOPS.find(s => s.id === data.to);
