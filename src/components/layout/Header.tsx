@@ -1,0 +1,143 @@
+import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Phone, Menu, X, Bus } from 'lucide-react';
+import { CONTACTS } from '../../data/routes';
+
+interface HeaderProps {
+  onBookNow: () => void;
+}
+
+export default function Header({ onBookNow }: HeaderProps) {
+  const [scrolled, setScrolled] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => setScrolled(window.scrollY > 20);
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const navLinks = [
+    { label: 'Маршрути', href: '#schedule' },
+    { label: 'Розклад', href: '#schedule' },
+    { label: 'Бронювання', href: '#booking' },
+    { label: 'Відгуки', href: '#reviews' },
+    { label: 'Контакти', href: '#contacts' },
+  ];
+
+  return (
+    <>
+      <motion.header
+        initial={{ y: -80, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.5, ease: 'easeOut' }}
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+          scrolled
+            ? 'glass border-b border-brand-border shadow-lg'
+            : 'bg-transparent'
+        }`}
+      >
+        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+          {/* Logo */}
+          <div className="flex items-center gap-2">
+            <div className="w-10 h-10 rounded-xl bg-brand-yellow flex items-center justify-center shadow-brand">
+              <Bus size={20} className="text-brand-dark" />
+            </div>
+            <div>
+              <div className="font-display font-bold text-white text-base leading-tight">
+                Comfort Plus
+              </div>
+              <div className="text-brand-yellow text-xs font-medium">0777</div>
+            </div>
+          </div>
+
+          {/* Desktop nav */}
+          <nav className="hidden md:flex items-center gap-6">
+            {navLinks.map((link) => (
+              <a
+                key={link.label}
+                href={link.href}
+                className="text-brand-light hover:text-brand-yellow transition-colors duration-200 text-sm font-medium"
+              >
+                {link.label}
+              </a>
+            ))}
+          </nav>
+
+          {/* Phone + CTA */}
+          <div className="hidden md:flex items-center gap-3">
+            <a
+              href={`tel:${CONTACTS.phone1}`}
+              className="flex items-center gap-2 text-brand-yellow text-sm font-semibold hover:text-brand-gold transition-colors"
+            >
+              <Phone size={14} />
+              {CONTACTS.phone1Display}
+            </a>
+            <button
+              onClick={onBookNow}
+              className="btn-primary text-sm py-2 px-4"
+            >
+              Забронювати
+            </button>
+          </div>
+
+          {/* Mobile menu toggle */}
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
+            className="md:hidden w-10 h-10 flex items-center justify-center rounded-xl border border-brand-border text-brand-light hover:text-brand-yellow hover:border-brand-yellow transition-all"
+          >
+            {menuOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
+        </div>
+      </motion.header>
+
+      {/* Mobile menu */}
+      <AnimatePresence>
+        {menuOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.2 }}
+            className="fixed top-[64px] left-0 right-0 z-40 glass border-b border-brand-border px-4 py-4"
+          >
+            <nav className="flex flex-col gap-1">
+              {navLinks.map((link) => (
+                <a
+                  key={link.label}
+                  href={link.href}
+                  onClick={() => setMenuOpen(false)}
+                  className="py-3 px-4 text-brand-light hover:text-brand-yellow hover:bg-brand-surface rounded-xl transition-all duration-200 font-medium"
+                >
+                  {link.label}
+                </a>
+              ))}
+              <div className="mt-2 pt-2 border-t border-brand-border flex flex-col gap-2">
+                <a
+                  href={`tel:${CONTACTS.phone1}`}
+                  className="flex items-center gap-2 py-3 px-4 text-brand-yellow font-semibold"
+                >
+                  <Phone size={16} />
+                  {CONTACTS.phone1Display}
+                </a>
+                <a
+                  href={`tel:${CONTACTS.phone2}`}
+                  className="flex items-center gap-2 py-3 px-4 text-brand-yellow font-semibold"
+                >
+                  <Phone size={16} />
+                  {CONTACTS.phone2Display}
+                </a>
+                <button
+                  onClick={() => { onBookNow(); setMenuOpen(false); }}
+                  className="btn-primary text-center"
+                >
+                  Забронювати місце
+                </button>
+              </div>
+            </nav>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
+  );
+}

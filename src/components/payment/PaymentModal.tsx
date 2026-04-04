@@ -1,0 +1,176 @@
+import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { X, CheckCircle, MessageSquare, Bus, Phone } from 'lucide-react';
+import type { BookingData } from './BookingForm';
+import { STOPS } from '../../data/routes';
+import SuccessScreen from '../payment/SuccessScreen';
+
+interface PaymentModalProps {
+  data: BookingData;
+  onClose: () => void;
+}
+
+type PayStep = 'choose' | 'processing' | 'success';
+
+export default function PaymentModal({ data, onClose }: PaymentModalProps) {
+  const [step, setStep] = useState<PayStep>('choose');
+  const [method, setMethod] = useState<'applepay' | 'googlepay' | 'card' | null>(null);
+
+  const fromStop = STOPS.find(s => s.id === data.from);
+  const toStop = STOPS.find(s => s.id === data.to);
+
+  const handlePay = (m: 'applepay' | 'googlepay' | 'card') => {
+    setMethod(m);
+    setStep('processing');
+    setTimeout(() => setStep('success'), 2200);
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+
+      <motion.div
+        initial={{ y: '100%', opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        exit={{ y: '100%', opacity: 0 }}
+        transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+        className="relative z-10 w-full md:max-w-md bg-brand-card border border-brand-border rounded-t-3xl md:rounded-3xl overflow-hidden"
+      >
+        <AnimatePresence mode="wait">
+          {step === 'choose' && (
+            <motion.div key="choose" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+              {/* Handle bar (mobile) */}
+              <div className="flex justify-center pt-3 md:hidden">
+                <div className="w-10 h-1 bg-brand-border rounded-full" />
+              </div>
+
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-brand-border">
+                <div>
+                  <div className="text-white font-display font-bold text-lg">Оплата</div>
+                  <div className="text-brand-muted text-sm">Безпечна транзакція</div>
+                </div>
+                <button
+                  onClick={onClose}
+                  className="w-9 h-9 flex items-center justify-center rounded-xl border border-brand-border text-brand-muted hover:text-white hover:border-brand-yellow transition-all"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* Order summary */}
+              <div className="px-6 py-4 border-b border-brand-border">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 bg-brand-yellow/10 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <Bus size={18} className="text-brand-yellow" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-white font-semibold">
+                      {fromStop?.name} → {toStop?.name}
+                    </div>
+                    <div className="text-brand-muted text-sm mt-0.5">
+                      {data.date.toLocaleDateString('uk-UA', { day: 'numeric', month: 'long' })} · {data.departureTime} · {data.seats} {data.seats === 1 ? 'місце' : 'місця'}
+                    </div>
+                    <div className="text-brand-muted text-sm">
+                      {data.name}
+                    </div>
+                  </div>
+                  <div className="text-brand-yellow font-display font-bold text-xl">
+                    {data.price} грн
+                  </div>
+                </div>
+              </div>
+
+              {/* Payment methods */}
+              <div className="px-6 py-5 space-y-3">
+                <p className="text-brand-muted text-xs uppercase tracking-wide font-medium mb-4">
+                  Оберіть спосіб оплати
+                </p>
+
+                {/* Apple Pay */}
+                <button
+                  onClick={() => handlePay('applepay')}
+                  className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl bg-white text-black font-semibold text-base hover:bg-gray-100 active:scale-98 transition-all duration-150 shadow-md"
+                >
+                  <svg viewBox="0 0 24 24" className="w-6 h-6" fill="currentColor">
+                    <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
+                  </svg>
+                  Apple Pay
+                </button>
+
+                {/* Google Pay */}
+                <button
+                  onClick={() => handlePay('googlepay')}
+                  className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl bg-brand-surface border border-brand-border text-white font-semibold text-base hover:bg-brand-border active:scale-98 transition-all duration-150"
+                >
+                  <svg viewBox="0 0 24 24" className="w-6 h-6">
+                    <path d="M12 24c6.627 0 12-5.373 12-12S18.627 0 12 0 0 5.373 0 12s5.373 12 12 12z" fill="#fff"/>
+                    <path d="M12 24c6.627 0 12-5.373 12-12S18.627 0 12 0 0 5.373 0 12s5.373 12 12 12z" fill="url(#a)"/>
+                    <path d="m11.21 12 3.4-3.37L6.55 12l3.91 3.7 3.56-3.7" fill="#4285F4"/>
+                    <text x="12" y="15.5" textAnchor="middle" fontSize="5" fontFamily="Arial" fontWeight="bold" fill="#4285F4">G</text>
+                    <defs>
+                      <linearGradient id="a" x1="0" y1="0" x2="24" y2="24">
+                        <stop offset="0%" stopColor="#fff" stopOpacity="0"/>
+                        <stop offset="100%" stopColor="#fff" stopOpacity="0"/>
+                      </linearGradient>
+                    </defs>
+                  </svg>
+                  <div className="flex items-center">
+                    <span style={{color:'#4285F4', fontWeight:700}}>G</span>
+                    <span style={{color:'#EA4335', fontWeight:700}}>o</span>
+                    <span style={{color:'#FBBC05', fontWeight:700}}>o</span>
+                    <span style={{color:'#4285F4', fontWeight:700}}>g</span>
+                    <span style={{color:'#34A853', fontWeight:700}}>l</span>
+                    <span style={{color:'#EA4335', fontWeight:700}}>e</span>
+                    <span className="text-white ml-1">Pay</span>
+                  </div>
+                </button>
+
+                {/* Card payment */}
+                <button
+                  onClick={() => handlePay('card')}
+                  className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl bg-brand-yellow text-brand-dark font-bold text-base hover:bg-brand-gold active:scale-98 transition-all duration-150 shadow-brand"
+                >
+                  💳 Оплатити карткою · {data.price} грн
+                </button>
+
+                <p className="text-center text-brand-muted text-xs mt-2">
+                  🔒 Захищено 256-bit SSL шифруванням
+                </p>
+              </div>
+            </motion.div>
+          )}
+
+          {step === 'processing' && (
+            <motion.div
+              key="processing"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex flex-col items-center justify-center py-16 px-6"
+            >
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                className="w-16 h-16 border-4 border-brand-yellow/30 border-t-brand-yellow rounded-full mb-6"
+              />
+              <h3 className="text-white font-display font-bold text-xl mb-2">Обробляємо оплату</h3>
+              <p className="text-brand-muted text-sm text-center">Зачекайте кілька секунд...</p>
+            </motion.div>
+          )}
+
+          {step === 'success' && (
+            <SuccessScreen data={data} onClose={onClose} />
+          )}
+        </AnimatePresence>
+      </motion.div>
+    </motion.div>
+  );
+}
