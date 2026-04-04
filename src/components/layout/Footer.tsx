@@ -64,7 +64,7 @@ export default function Footer() {
               </div>
               <div className="flex items-center gap-3 text-brand-muted text-sm">
                 <Bus size={16} className="text-brand-yellow flex-shrink-0" />
-                <span>Mercedes Sprinter • 18 місць</span>
+                <span>MB Sprinter та VW Crafter • по 12 місць</span>
               </div>
             </div>
           </div>

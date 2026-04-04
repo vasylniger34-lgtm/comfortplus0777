@@ -17,7 +17,7 @@ function FeaturesSection() {
     {
       icon: Shield,
       title: 'Безпека та надійність',
-      desc: 'Досвідчені водії, технічно справні Mercedes Sprinter з 2024 року',
+      desc: 'Досвідчені водії, технічно справні MB Sprinter та VW Crafter з 2024 року',
     },
     {
       icon: Clock,

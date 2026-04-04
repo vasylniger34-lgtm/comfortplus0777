@@ -67,7 +67,7 @@ export default function Hero({ onBookNow }: HeroProps) {
             >
               Львів ↔ Стебник ↔ Трускавець ↔ Борислав ↔ Східниця
               <br />
-              <span className="text-brand-muted text-base">Mercedes Sprinter · 18 місць · Клімат-контроль</span>
+              <span className="text-brand-muted text-base">MB Sprinter та VW Crafter · по 12 місць · Клімат-контроль</span>
             </motion.p>
 
             <motion.div
@@ -188,9 +188,9 @@ export default function Hero({ onBookNow }: HeroProps) {
               <motion.div
                 animate={{ y: [0, -6, 0] }}
                 transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-                className="absolute -top-4 -right-4 bg-brand-yellow text-brand-dark rounded-2xl px-4 py-2 font-display font-bold text-sm shadow-brand-lg"
+                className="absolute -top-4 -right-4 bg-brand-yellow text-brand-dark rounded-2xl px-4 py-2 font-display font-medium text-xs shadow-brand-lg text-center"
               >
-                Mercedes Sprinter
+                MB Sprinter<br/>VW Crafter
               </motion.div>
             </div>
           </motion.div>

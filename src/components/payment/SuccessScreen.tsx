@@ -126,7 +126,7 @@ export default function SuccessScreen({ data, onClose }: SuccessScreenProps) {
               </div>
               <div className="text-center">
                 <div className="text-white font-display font-bold text-xl">{toStop?.name}</div>
-                <div className="text-brand-muted text-xs">Mercedes Sprinter</div>
+                <div className="text-brand-muted text-[10px]">MB Sprinter/VW Crafter</div>
               </div>
             </div>
 
