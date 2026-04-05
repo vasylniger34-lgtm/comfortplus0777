@@ -1,4 +1,3 @@
-import { motion } from 'framer-motion';
 import { Users, Phone } from 'lucide-react';
 import { CONTACTS } from '../../data/routes';
 

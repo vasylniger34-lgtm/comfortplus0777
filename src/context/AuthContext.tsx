@@ -150,14 +150,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       saveBookings(user.id, updated);
       
       // Auto-mark as completed for demo purposes after booking
-      simulateCompletion(user.id, record.id);
+      simulateCompletion(user.id);
     }
     
     return record;
   };
 
   // Mock function to increment loyalty manually or simulate completed ride
-  const simulateCompletion = (userId: string, bookingId: string) => {
+  const simulateCompletion = (userId: string) => {
       // In a real app this happens via admin panel
       // We'll just increment completedRides slightly for demo
       setTimeout(() => {
