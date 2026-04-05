@@ -156,10 +156,18 @@ export default function ChatWidget() {
       console.error('Telegram error', e);
     }
 
-    // 3. Авто-відповідь бота (якщо це не було оброблено оператором)
+    // 3. Авто-відповідь бота (якщо це не було оброблено оператором і повідомлення ще не було)
     setTimeout(() => {
       const replyText = getBotReply(text);
       if (replyText !== BOT_REPLIES.default) {
+        // Перевіряємо, чи вже було таке повідомлення в цій сесії (щоб не спамити "Ваше повідомлення надіслано")
+        const alreadyNotified = messages.some(m => m.text.includes('надіслано диспетчеру'));
+        
+        if (replyText.includes('надіслано диспетчеру') && alreadyNotified) {
+            setTyping(false);
+            return;
+        }
+
         const botMsg: Message = {
           id: (Date.now() + 1).toString(),
           text: replyText,

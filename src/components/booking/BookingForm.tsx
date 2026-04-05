@@ -1,7 +1,8 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeftRight, User, Phone, MapPin, ArrowRight, ChevronDown } from 'lucide-react';
+import { ArrowLeftRight, User, Phone, MapPin, ArrowRight, ChevronDown, Clock } from 'lucide-react';
 import { STOPS, getPrice } from '../../data/routes';
+import { useAuth } from '../../context/AuthContext';
 
 import DatePicker from './DatePicker';
 
@@ -94,10 +95,8 @@ function StopSelect({
   );
 }
 
-const MORNING_TIMES = ['05:50', '06:20', '07:10', '08:15', '08:50', '09:30', '10:35'];
-const AFTERNOON_TIMES = ['11:10', '12:00', '12:40', '13:20', '14:10', '15:30', '16:20', '17:00', '17:40'];
-
 export default function BookingForm({ onPay }: BookingFormProps) {
+  const { user } = useAuth();
   const [from, setFrom] = useState('lviv');
   const [to, setTo] = useState('skhidnytsia');
   const [date, setDate] = useState<Date | null>(null);
@@ -109,6 +108,30 @@ export default function BookingForm({ onPay }: BookingFormProps) {
 
   const price = getPrice(from, to);
 
+  // Автозаповнення даних з профілю
+  useEffect(() => {
+    if (user && !name && phone === '+380') {
+      setName(user.name);
+      setPhone(user.phone);
+    }
+  }, [user]);
+
+  // Перевірка чи час відправлення вже минув (для сьогодні)
+  const isTimeDisabled = (time: string) => {
+    if (!date) return false;
+    const now = new Date();
+    const isToday = date.toDateString() === now.toDateString();
+    if (!isToday) return false;
+
+    const [hours, minutes] = time.split(':').map(Number);
+    const departureDate = new Date(date);
+    departureDate.setHours(hours, minutes, 0, 0);
+    
+    return departureDate < now;
+  };
+
+  const MORNING_TIMES = ['05:50', '06:20', '07:10', '08:15', '08:50', '09:30', '10:35'];
+  const AFTERNOON_TIMES = ['11:10', '12:00', '12:40', '13:20', '14:10', '15:30', '16:20', '17:00', '17:40'];
 
   const swapStops = () => {
     const temp = from;
@@ -117,7 +140,6 @@ export default function BookingForm({ onPay }: BookingFormProps) {
   };
 
   const formatPhone = (val: string) => {
-    // Keep +380 prefix and format as +380 XX XXX XX XX
     let digits = val.replace(/\D/g, '');
     if (!digits.startsWith('380')) digits = '380' + digits.replace(/^380/, '');
     digits = digits.slice(0, 12);
@@ -159,111 +181,82 @@ export default function BookingForm({ onPay }: BookingFormProps) {
         initial={{ opacity: 0, y: 30 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
-        transition={{ duration: 0.5 }}
-        className="text-center mb-10"
-      >
-        <div className="label mb-3">Швидке бронювання</div>
-        <h2 className="section-title mb-3">Забронюйте місце онлайн</h2>
-        <p className="text-brand-muted max-w-md mx-auto">
-          Безпечна оплата · Миттєве підтвердження · SMS-повідомлення
-        </p>
-      </motion.div>
-
-      <motion.div
-        initial={{ opacity: 0, y: 30 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true }}
         transition={{ duration: 0.5, delay: 0.1 }}
         className="max-w-2xl mx-auto"
       >
         <form onSubmit={handleSubmit} className="card p-6 md:p-8 space-y-6">
-          {/* Route selection */}
-          <div>
-            <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
-              <div className="w-6 h-6 rounded-full bg-brand-yellow/20 flex items-center justify-center text-brand-yellow text-xs font-bold">1</div>
-              Маршрут
-            </h3>
-            <div className="grid grid-cols-[1fr,auto,1fr] gap-2 items-end">
-              <StopSelect value={from} onChange={v => { setFrom(v); setErrors(e => ({ ...e, from: '' })); }} excludeId={to} label="Звідки" />
-              <button
-                type="button"
-                onClick={swapStops}
-                className="mb-0.5 w-10 h-10 rounded-xl bg-brand-surface border border-brand-border hover:border-brand-yellow hover:bg-brand-yellow/10 flex items-center justify-center transition-all duration-200 group"
-              >
-                <ArrowLeftRight size={16} className="text-brand-muted group-hover:text-brand-yellow transition-colors" />
-              </button>
-              <StopSelect value={to} onChange={v => { setTo(v); setErrors(e => ({ ...e, to: '' })); }} excludeId={from} label="Куди" />
-            </div>
-            {(errors.from || errors.to) && (
-              <p className="text-red-400 text-xs mt-1">{errors.from || errors.to}</p>
-            )}
+          <div className="grid md:grid-cols-[1fr,auto,1fr] gap-4 items-end">
+            <StopSelect value={from} onChange={setFrom} excludeId={to} label="Звідки" />
+            <button type="button" onClick={swapStops} className="p-3 rounded-full bg-brand-surface border border-brand-border text-brand-yellow hover:bg-brand-yellow/10 transition-colors">
+              <ArrowLeftRight size={20} />
+            </button>
+            <StopSelect value={to} onChange={setTo} excludeId={from} label="Куди" />
           </div>
 
-          {/* Price preview */}
-          {price > 0 && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              className="bg-brand-yellow/10 border border-brand-yellow/30 rounded-xl px-4 py-3 flex items-center justify-between"
-            >
-              <div className="flex items-center gap-2 text-sm text-brand-light">
-                <ArrowRight size={14} className="text-brand-yellow" />
-                {STOPS.find(s=>s.id===from)?.name} → {STOPS.find(s=>s.id===to)?.name}
-              </div>
-              <div className="text-brand-yellow font-bold text-lg">{price} грн</div>
-            </motion.div>
-          )}
-
-          {/* Date */}
           <div>
             <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
               <div className="w-6 h-6 rounded-full bg-brand-yellow/20 flex items-center justify-center text-brand-yellow text-xs font-bold">2</div>
               Дата та час
             </h3>
             <div className="label mb-2">Дата поїздки</div>
-            <DatePicker value={date} onChange={d => { setDate(d); setErrors(e => ({ ...e, date: '' })); }} />
+            <DatePicker value={date} onChange={d => { setDate(d); setErrors(e => ({ ...e, date: '' })); setSelectedTime(''); }} />
             {errors.date && <p className="text-red-400 text-xs mt-1">{errors.date}</p>}
 
-            {/* Time selection */}
             <div className="mt-4">
               <div className="label mb-2">Час відправлення</div>
-              <div className="space-y-2">
+              <div className="space-y-4">
                 <div>
-                  <div className="text-brand-muted text-xs mb-1.5">Вранці</div>
+                  <div className="text-brand-muted text-[10px] uppercase font-bold tracking-wider mb-2 flex items-center gap-1.5 opacity-60">
+                    <Clock size={10} /> Вранці
+                  </div>
                   <div className="flex flex-wrap gap-2">
-                    {MORNING_TIMES.map(time => (
-                      <button
-                        key={time}
-                        type="button"
-                        onClick={() => { setSelectedTime(time); setErrors(e => ({ ...e, time: '' })); }}
-                        className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 ${
-                          selectedTime === time
-                            ? 'bg-brand-yellow text-brand-dark shadow-brand'
-                            : 'bg-brand-surface border border-brand-border text-brand-light hover:border-brand-yellow/50 hover:text-brand-yellow'
-                        }`}
-                      >
-                        {time}
-                      </button>
-                    ))}
+                    {MORNING_TIMES.map(time => {
+                      const disabled = isTimeDisabled(time);
+                      return (
+                        <button
+                          key={time}
+                          type="button"
+                          disabled={disabled}
+                          onClick={() => { setSelectedTime(time); setErrors(e => ({ ...e, time: '' })); }}
+                          className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 ${
+                            selectedTime === time
+                              ? 'bg-brand-yellow text-brand-dark shadow-brand'
+                              : disabled 
+                                ? 'bg-brand-dark border border-brand-border text-brand-muted opacity-40 cursor-not-allowed'
+                                : 'bg-brand-surface border border-brand-border text-brand-light hover:border-brand-yellow/50 hover:text-brand-yellow'
+                          }`}
+                        >
+                          {time}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
                 <div>
-                  <div className="text-brand-muted text-xs mb-1.5">Вдень/Ввечері</div>
+                  <div className="text-brand-muted text-[10px] uppercase font-bold tracking-wider mb-2 flex items-center gap-1.5 opacity-60">
+                    <Clock size={10} /> Вдень / Вечір
+                  </div>
                   <div className="flex flex-wrap gap-2">
-                    {AFTERNOON_TIMES.map(time => (
-                      <button
-                        key={time}
-                        type="button"
-                        onClick={() => { setSelectedTime(time); setErrors(e => ({ ...e, time: '' })); }}
-                        className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 ${
-                          selectedTime === time
-                            ? 'bg-brand-yellow text-brand-dark shadow-brand'
-                            : 'bg-brand-surface border border-brand-border text-brand-light hover:border-brand-yellow/50 hover:text-brand-yellow'
-                        }`}
-                      >
-                        {time}
-                      </button>
-                    ))}
+                    {AFTERNOON_TIMES.map(time => {
+                      const disabled = isTimeDisabled(time);
+                      return (
+                        <button
+                          key={time}
+                          type="button"
+                          disabled={disabled}
+                          onClick={() => { setSelectedTime(time); setErrors(e => ({ ...e, time: '' })); }}
+                          className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 ${
+                            selectedTime === time
+                              ? 'bg-brand-yellow text-brand-dark shadow-brand'
+                              : disabled 
+                                ? 'bg-brand-dark border border-brand-border text-brand-muted opacity-40 cursor-not-allowed'
+                                : 'bg-brand-surface border border-brand-border text-brand-light hover:border-brand-yellow/50 hover:text-brand-yellow'
+                          }`}
+                        >
+                          {time}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -271,7 +264,6 @@ export default function BookingForm({ onPay }: BookingFormProps) {
             </div>
           </div>
 
-          {/* Seats */}
           <div>
             <div className="label mb-2">Кількість місць</div>
             <div className="flex items-center gap-4">
