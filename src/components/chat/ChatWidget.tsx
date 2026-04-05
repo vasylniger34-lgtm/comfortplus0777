@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MessageCircle, X, Send, Bot } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 
 type Message = {
   id: string;
@@ -44,27 +45,102 @@ export default function ChatWidget() {
   const [typing, setTyping] = useState(false);
   const [unread, setUnread] = useState(1);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [sessionId, setSessionId] = useState<string>('');
+
+  // Ініціалізація сесії та завантаження історії
+  useEffect(() => {
+    let sId = localStorage.getItem('chat_session_id');
+    if (!sId) {
+      sId = Math.random().toString(36).substring(2, 12);
+      localStorage.setItem('chat_session_id', sId);
+    }
+    setSessionId(sId);
+
+    const loadHistory = async () => {
+      const { data, error } = await supabase
+        .from('chat_messages')
+        .select('*')
+        .eq('session_id', sId)
+        .order('created_at', { ascending: true });
+
+      if (data && !error) {
+        const history: Message[] = data.map(m => ({
+          id: m.id,
+          text: m.text,
+          from: m.is_bot_reply ? 'bot' : 'user',
+          ts: new Date(m.created_at)
+        }));
+        setMessages(prev => [...prev, ...history]);
+      }
+    };
+
+    loadHistory();
+
+    // Підписка на нові повідомлення в реальному часі
+    const channel = supabase
+      .channel('chat_messages')
+      .on('postgres_changes', { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: 'chat_messages',
+        filter: `session_id=eq.${sId}`
+      }, (payload) => {
+        const newMsg = payload.new;
+        if (newMsg.is_bot_reply) {
+          setMessages(prev => {
+            // Уникаємо дублів
+            if (prev.find(m => m.id === newMsg.id)) return prev;
+            return [...prev, {
+              id: newMsg.id,
+              text: newMsg.text,
+              from: 'bot',
+              ts: new Date(newMsg.created_at)
+            }];
+          });
+          if (!open) setUnread(u => u + 1);
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   useEffect(() => {
     if (open) {
       setUnread(0);
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
     }
   }, [open, messages]);
 
-  const sendMessage = () => {
+  const sendMessage = async () => {
     if (!input.trim()) return;
+    
+    const text = input;
+    const tempId = Date.now().toString();
+    
     const userMsg: Message = {
-      id: Date.now().toString(),
-      text: input,
+      id: tempId,
+      text: text,
       from: 'user',
       ts: new Date(),
     };
+    
     setMessages(prev => [...prev, userMsg]);
     setInput('');
     setTyping(true);
 
-    // Відправка повідомлення в Telegram
+    // 1. Запис у Supabase
+    await supabase
+      .from('chat_messages')
+      .insert([
+        { session_id: sessionId, text: text, is_bot_reply: false }
+      ]);
+
+    // 2. Відправка в Telegram через API
     try {
       fetch('https://api.telegram.org/bot8615069227:AAEiCjdj66e469JqarZxWSlfzFQs1jGkr4M/sendMessage', {
         method: 'POST',
@@ -73,21 +149,25 @@ export default function ChatWidget() {
         },
         body: JSON.stringify({
           chat_id: '8472692319',
-          text: `📩 Нове звернення з сайту:\n\n💬 ${input}`
+          text: `📩 Нове звернення з сайту [ID: ${sessionId}]:\n\n💬 ${text}`
         })
       });
     } catch (e) {
       console.error('Telegram error', e);
     }
 
+    // 3. Авто-відповідь бота (якщо це не було оброблено оператором)
     setTimeout(() => {
-      const botMsg: Message = {
-        id: (Date.now() + 1).toString(),
-        text: getBotReply(input),
-        from: 'bot',
-        ts: new Date(),
-      };
-      setMessages(prev => [...prev, botMsg]);
+      const replyText = getBotReply(text);
+      if (replyText !== BOT_REPLIES.default) {
+        const botMsg: Message = {
+          id: (Date.now() + 1).toString(),
+          text: replyText,
+          from: 'bot',
+          ts: new Date(),
+        };
+        setMessages(prev => [...prev, botMsg]);
+      }
       setTyping(false);
     }, 1200);
   };
@@ -185,7 +265,11 @@ export default function ChatWidget() {
                   key={qr}
                   onClick={() => {
                     setInput(qr);
-                    setTimeout(() => sendMessage(), 50);
+                    // ВикликsendMessage з невеликою затримкою для оновлення input
+                    setTimeout(() => {
+                        const btn = document.getElementById('chat-send-btn');
+                        btn?.click();
+                    }, 10);
                   }}
                   className="flex-shrink-0 text-xs px-3 py-1.5 rounded-full border border-brand-yellow/30 text-brand-yellow hover:bg-brand-yellow/10 transition-all"
                 >
@@ -206,6 +290,7 @@ export default function ChatWidget() {
                   className="flex-1 bg-brand-surface border border-brand-border rounded-xl px-3 py-2.5 text-sm text-white placeholder-brand-muted focus:outline-none focus:border-brand-yellow transition-colors"
                 />
                 <button
+                  id="chat-send-btn"
                   onClick={sendMessage}
                   className="w-10 h-10 bg-brand-yellow rounded-xl flex items-center justify-center hover:bg-brand-gold transition-colors flex-shrink-0"
                 >

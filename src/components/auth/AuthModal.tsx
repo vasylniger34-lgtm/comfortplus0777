@@ -27,7 +27,7 @@ export default function AuthModal({ onClose }: AuthModalProps) {
     return formatted;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     
@@ -41,7 +41,7 @@ export default function AuthModal({ onClose }: AuthModalProps) {
     }
 
     if (mode === 'login') {
-      const success = login(phone, password);
+      const success = await login(phone, password);
       if (success) {
         onClose();
       } else {
@@ -52,11 +52,11 @@ export default function AuthModal({ onClose }: AuthModalProps) {
         setError('Введіть ваше ім\'я');
         return;
       }
-      const newUser = register(name, phone, password);
+      const newUser = await register(name, phone, password);
       if (newUser) {
         onClose();
       } else {
-        setError('Користувач з таким номером вже існує');
+        setError('Помилка реєстрації. Можливо, номер уже зайнятий.');
       }
     }
   };

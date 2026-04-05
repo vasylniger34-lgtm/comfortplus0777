@@ -27,16 +27,22 @@ export default function SuccessScreen({ data, onClose }: SuccessScreenProps) {
 
   useEffect(() => {
     if (user && !hasSavedBooking) {
-      addBooking(data);
-      setHasSavedBooking(true);
+      const save = async () => {
+        await addBooking(data);
+        setHasSavedBooking(true);
+      };
+      save();
     }
   }, [user, data, addBooking, hasSavedBooking]);
 
-  const handleRegister = () => {
+  const handleRegister = async () => {
     if (password.length >= 4) {
-      register(data.name, data.phone, password);
-      setRegistered(true);
-      setTimeout(() => addBooking(data), 100);
+      const newUser = await register(data.name, data.phone, password);
+      if (newUser) {
+        setRegistered(true);
+        await addBooking(data);
+        setHasSavedBooking(true);
+      }
     }
   };
 

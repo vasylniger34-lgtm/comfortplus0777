@@ -129,7 +129,9 @@ export default function CabinetModal({ onClose }: CabinetModalProps) {
                         ) : (
                           <span className="px-2 py-0.5 rounded text-xs bg-red-500/10 text-red-400 font-medium border border-red-500/20">Скасовано</span>
                         )}
-                        <span className="text-xs text-brand-muted font-mono">{booking.id.replace('b_', 'CP')}</span>
+                        <span className="text-xs text-brand-muted font-mono">
+                          #{booking.id.includes('_') ? booking.id.split('_')[1] : booking.id.slice(0, 6).toUpperCase()}
+                        </span>
                       </div>
                     </div>
                     
@@ -137,9 +139,9 @@ export default function CabinetModal({ onClose }: CabinetModalProps) {
                       <div className="text-white font-bold">{booking.price === 0 ? 'Безкоштовно' : `${booking.price} грн`}</div>
                       {booking.status === 'active' && (
                         <button 
-                          onClick={() => {
+                          onClick={async () => {
                             if (window.confirm('Ви впевнені, що хочете скасувати поїздку?')) {
-                              cancelBooking(booking.id);
+                              await cancelBooking(booking.id);
                             }
                           }}
                           className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300 transition-colors px-3 py-1.5 border border-red-500/30 rounded-lg hover:bg-red-500/10"
