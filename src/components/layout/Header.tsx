@@ -1,13 +1,16 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Phone, Menu, X, Bus } from 'lucide-react';
+import { Phone, Menu, X, Bus, User } from 'lucide-react';
 import { CONTACTS } from '../../data/routes';
+import { useAuth } from '../../context/AuthContext';
 
 interface HeaderProps {
   onBookNow: () => void;
+  onOpenCabinet: () => void;
 }
 
-export default function Header({ onBookNow }: HeaderProps) {
+export default function Header({ onBookNow, onOpenCabinet }: HeaderProps) {
+  const { user } = useAuth();
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -79,6 +82,17 @@ export default function Header({ onBookNow }: HeaderProps) {
             >
               Забронювати
             </button>
+            <button
+              onClick={onOpenCabinet}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-colors ${
+                user 
+                  ? 'bg-brand-yellow/10 border-brand-yellow/30 text-brand-yellow hover:bg-brand-yellow/20' 
+                  : 'bg-brand-surface border-brand-border text-brand-light hover:border-brand-yellow hover:text-brand-yellow'
+              }`}
+            >
+              <User size={16} />
+              <span className="text-sm font-medium">{user ? 'Кабінет' : 'Увійти'}</span>
+            </button>
           </div>
 
           {/* Mobile menu toggle */}
@@ -132,6 +146,17 @@ export default function Header({ onBookNow }: HeaderProps) {
                   className="btn-primary text-center"
                 >
                   Забронювати місце
+                </button>
+                <button
+                  onClick={() => { onOpenCabinet(); setMenuOpen(false); }}
+                  className={`mt-2 py-3 rounded-xl border flex items-center justify-center gap-2 transition-colors ${
+                    user 
+                      ? 'bg-brand-yellow/10 border-brand-yellow/30 text-brand-yellow font-medium' 
+                      : 'bg-brand-surface border-brand-border text-brand-light font-medium hover:border-brand-yellow hover:text-brand-yellow'
+                  }`}
+                >
+                  <User size={18} />
+                  {user ? 'Мій Кабінет' : 'Увійти'}
                 </button>
               </div>
             </nav>

@@ -1,9 +1,10 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { CheckCircle, MessageSquare, Bus, Phone, FileText } from 'lucide-react';
+import { CheckCircle, MessageSquare, Bus, Phone, FileText, Gift, Lock } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import type { BookingData } from '../booking/BookingForm';
+import { useAuth } from '../../context/AuthContext';
 import { STOPS, CONTACTS } from '../../data/routes';
 
 interface SuccessScreenProps {
@@ -15,9 +16,29 @@ export default function SuccessScreen({ data, onClose }: SuccessScreenProps) {
   const ticketRef = useRef<HTMLDivElement>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [ticketNumber] = useState(`CP${Date.now().toString().slice(-6)}`);
+  
+  const { user, register, addBooking } = useAuth();
+  const [password, setPassword] = useState('');
+  const [registered, setRegistered] = useState(false);
+  const [hasSavedBooking, setHasSavedBooking] = useState(false);
 
   const fromStop = STOPS.find(s => s.id === data.from);
   const toStop = STOPS.find(s => s.id === data.to);
+
+  useEffect(() => {
+    if (user && !hasSavedBooking) {
+      addBooking(data);
+      setHasSavedBooking(true);
+    }
+  }, [user, data, addBooking, hasSavedBooking]);
+
+  const handleRegister = () => {
+    if (password.length >= 4) {
+      register(data.name, data.phone, password);
+      setRegistered(true);
+      setTimeout(() => addBooking(data), 100);
+    }
+  };
 
   const handleDownloadPDF = async () => {
     if (!ticketRef.current || isGenerating) return;
@@ -53,13 +74,11 @@ export default function SuccessScreen({ data, onClose }: SuccessScreenProps) {
       transition={{ duration: 0.4, type: 'spring' }}
       className="flex flex-col"
     >
-      {/* Handle bar (mobile) */}
       <div className="flex justify-center pt-3 md:hidden">
         <div className="w-10 h-1 bg-brand-border rounded-full" />
       </div>
 
       <div className="px-6 pb-6 pt-4">
-        {/* Success icon */}
         <div className="flex flex-col items-center text-center mb-6">
           <motion.div
             initial={{ scale: 0 }}
@@ -75,7 +94,6 @@ export default function SuccessScreen({ data, onClose }: SuccessScreenProps) {
           </motion.div>
         </div>
 
-        {/* SMS notification */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -91,7 +109,6 @@ export default function SuccessScreen({ data, onClose }: SuccessScreenProps) {
           </div>
         </motion.div>
 
-        {/* Ticket */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -99,7 +116,6 @@ export default function SuccessScreen({ data, onClose }: SuccessScreenProps) {
           ref={ticketRef}
           className="bg-brand-surface border border-brand-border rounded-2xl overflow-hidden mb-5 p-px"
         >
-          {/* Ticket header */}
           <div className="bg-brand-yellow/10 border-b border-brand-border px-5 py-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Bus size={16} className="text-brand-yellow" />
@@ -108,9 +124,7 @@ export default function SuccessScreen({ data, onClose }: SuccessScreenProps) {
             <span className="text-brand-muted text-xs font-mono">#{ticketNumber}</span>
           </div>
 
-          {/* Ticket body */}
           <div className="px-5 py-4 space-y-3">
-            {/* Route */}
             <div className="flex items-center justify-between">
               <div className="text-center">
                 <div className="text-white font-display font-bold text-xl">{fromStop?.name}</div>
@@ -176,6 +190,37 @@ export default function SuccessScreen({ data, onClose }: SuccessScreenProps) {
           transition={{ delay: 0.5 }}
           className="space-y-3"
         >
+          {!user && !registered && (
+            <div className="bg-brand-yellow/10 border border-brand-yellow/30 p-4 rounded-xl mb-4 text-left relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-3 opacity-20"><Gift size={64} className="text-brand-yellow" /></div>
+              <h4 className="text-brand-yellow font-bold text-sm mb-1">Збирайте безкоштовні поїздки!</h4>
+              <p className="text-brand-muted text-xs mb-3">
+                Створіть пароль для кабінету. Всі ваші дані вже збережені. Кожна 20-та поїздка за наш рахунок!
+              </p>
+              <div className="flex gap-2 relative z-10">
+                <div className="relative flex-1">
+                  <Lock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-muted" />
+                  <input 
+                    type="password" 
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Придумайте пароль" 
+                    className="w-full bg-brand-dark border border-brand-border rounded-lg pl-9 pr-3 py-2 text-sm text-white focus:border-brand-yellow/50 focus:outline-none"
+                  />
+                </div>
+                <button onClick={handleRegister} className="bg-brand-yellow text-brand-dark px-4 py-2 rounded-lg font-bold text-sm hover:bg-brand-gold transition-colors">
+                  Зберегти
+                </button>
+              </div>
+            </div>
+          )}
+
+          {registered && (
+            <div className="bg-green-500/10 border border-green-500/30 p-3 flex items-center justify-center gap-2 rounded-xl mb-4 text-green-400 text-sm font-medium">
+              <CheckCircle size={16} /> Акаунт створено!
+            </div>
+          )}
+
           <button
             onClick={handleDownloadPDF}
             disabled={isGenerating}

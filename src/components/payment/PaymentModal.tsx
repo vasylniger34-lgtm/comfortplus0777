@@ -4,6 +4,7 @@ import { X, Bus } from 'lucide-react';
 import type { BookingData } from '../booking/BookingForm';
 import { STOPS } from '../../data/routes';
 import SuccessScreen from './SuccessScreen';
+import { useAuth } from '../../context/AuthContext';
 
 interface PaymentModalProps {
   data: BookingData;
@@ -14,15 +15,21 @@ type PayStep = 'choose' | 'processing' | 'success';
 
 export default function PaymentModal({ data, onClose }: PaymentModalProps) {
   const [step, setStep] = useState<PayStep>('choose');
-  const [, setMethod] = useState<'applepay' | 'googlepay' | 'card' | null>(null);
+  const [, setMethod] = useState<'applepay' | 'googlepay' | 'card' | 'balance' | null>(null);
+  const { user, updateBalance } = useAuth();
 
   const fromStop = STOPS.find(s => s.id === data.from);
   const toStop = STOPS.find(s => s.id === data.to);
 
-  const handlePay = (m: 'applepay' | 'googlepay' | 'card') => {
+  const handlePay = (m: 'applepay' | 'googlepay' | 'card' | 'balance') => {
     setMethod(m);
     setStep('processing');
-    setTimeout(() => setStep('success'), 2200);
+    setTimeout(() => {
+      if (m === 'balance' && user) {
+        updateBalance(-data.price);
+      }
+      setStep('success');
+    }, 2200);
   };
 
   return (
@@ -93,6 +100,16 @@ export default function PaymentModal({ data, onClose }: PaymentModalProps) {
                 <p className="text-brand-muted text-xs uppercase tracking-wide font-medium mb-4">
                   Оберіть спосіб оплати
                 </p>
+
+                {/* Balance payment */}
+                {user && (user.balance || 0) >= data.price && (
+                  <button
+                    onClick={() => handlePay('balance')}
+                    className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl bg-green-500/10 border border-green-500/30 text-green-400 font-bold text-base hover:bg-green-500/20 active:scale-98 transition-all duration-150"
+                  >
+                    💚 Оплатити з балансу ({user.balance} грн)
+                  </button>
+                )}
 
                 {/* Apple Pay */}
                 <button
