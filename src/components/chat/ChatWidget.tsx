@@ -27,7 +27,7 @@ function getBotReply(msg: string): string {
   if (lower.includes('бронювання') || lower.includes('замовит') || lower.includes('купит')) return BOT_REPLIES.бронювання;
   if (lower.includes('привіт') || lower.includes('добрий') || lower.includes('вітаю') || lower.includes('hello')) return BOT_REPLIES.привіт;
   if (lower.includes('дякую') || lower.includes('дякуємо')) return BOT_REPLIES.дякую;
-  return 'Чудове запитання! Для детальної інформації зверніться до нас:\n📞 098 00 119 00\n📞 097 00 119 00\n\nАбо напишіть у Instagram: @comfortplus0777';
+  return 'Ваше повідомлення надіслано диспетчеру ✅\n\nЯкщо вам потрібно зателефонувати вкажіть ваш номер або @нікнейм, і ми швидко звʼяжемося з вами!';
 }
 
 export default function ChatWidget() {
@@ -63,6 +63,22 @@ export default function ChatWidget() {
     setMessages(prev => [...prev, userMsg]);
     setInput('');
     setTyping(true);
+
+    // Відправка повідомлення в Telegram
+    try {
+      fetch('https://api.telegram.org/bot8615069227:AAEiCjdj66e469JqarZxWSlfzFQs1jGkr4M/sendMessage', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          chat_id: '8472692319',
+          text: `📩 Нове звернення з сайту:\n\n💬 ${input}`
+        })
+      });
+    } catch (e) {
+      console.error('Telegram error', e);
+    }
 
     setTimeout(() => {
       const botMsg: Message = {
