@@ -22,7 +22,6 @@ export default function Header({ onBookNow, onOpenCabinet }: HeaderProps) {
 
   const navLinks = [
     { label: 'Маршрути', href: '#schedule' },
-    { label: 'Розклад', href: '#schedule' },
     { label: 'Бронювання', href: '#booking' },
     { label: 'Відгуки', href: '#reviews' },
     { label: 'Контакти', href: '#contacts' },
@@ -66,7 +65,7 @@ export default function Header({ onBookNow, onOpenCabinet }: HeaderProps) {
           </nav>
 
           {/* Phone + CTA */}
-          <div className="hidden md:flex items-center gap-3">
+          <div className="hidden md:flex flex-col items-end gap-1">
             <a
               href={`tel:${CONTACTS.phone1}`}
               className="flex items-center gap-2 text-brand-yellow text-sm font-semibold hover:text-brand-gold transition-colors"
@@ -74,9 +73,19 @@ export default function Header({ onBookNow, onOpenCabinet }: HeaderProps) {
               <Phone size={14} />
               {CONTACTS.phone1Display}
             </a>
+            <a
+              href={`tel:${CONTACTS.phone2}`}
+              className="flex items-center gap-2 text-brand-yellow text-sm font-semibold hover:text-brand-gold transition-colors"
+            >
+              <Phone size={14} />
+              {CONTACTS.phone2Display}
+            </a>
+          </div>
+
+          <div className="hidden md:flex items-center gap-3 ml-4">
             <button
               onClick={onBookNow}
-              className="btn-primary text-sm py-2 px-4"
+              className="btn-primary text-sm py-2.5 px-6"
             >
               Забронювати
             </button>
