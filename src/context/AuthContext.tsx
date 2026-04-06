@@ -1,6 +1,8 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import type { BookingData } from '../components/booking/BookingForm';
 import { supabase } from '../lib/supabase';
+import bcrypt from 'bcryptjs';
+
 
 export interface User {
   id: string;
@@ -21,8 +23,8 @@ interface AuthContextType {
   user: User | null;
   bookings: BookingRecord[];
   loading: boolean;
-  login: (phone: string, passwordHash: string) => Promise<boolean>;
-  register: (name: string, phone: string, passwordHash: string) => Promise<User | null>;
+  login: (phone: string, password: string) => Promise<boolean>;
+  register: (name: string, phone: string, password: string) => Promise<User | null>;
   logout: () => void;
   addBooking: (booking: BookingData) => Promise<BookingRecord | null>;
   cancelBooking: (id: string) => Promise<void>;
@@ -93,43 +95,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const login = async (phone: string, passwordHash: string) => {
+  const login = async (phone: string, password: string) => {
     setLoading(true);
     const rawPhone = phone.replace(/\D/g, '').slice(-9); // Останні 9 цифр для надійності
     
+    // Отримуємо користувача лише за номером телефону
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
       .ilike('phone', `%${rawPhone}%`)
-      .eq('password_hash', passwordHash)
       .single();
 
     if (data && !error) {
-      const loggedUser: User = {
-        id: data.id,
-        name: data.name,
-        phone: data.phone,
-        passwordHash: data.password_hash,
-        completedRides: data.completed_rides,
-        balance: data.balance
-      };
-      setUser(loggedUser);
-      localStorage.setItem('comfort_active_user_id', data.id);
-      await loadBookings(data.id);
-      setLoading(false);
-      return true;
+      // Порівнюємо введений пароль з хешем у базі
+      const isMatch = await bcrypt.compare(password, data.password_hash);
+      
+      if (isMatch) {
+        const loggedUser: User = {
+          id: data.id,
+          name: data.name,
+          phone: data.phone,
+          passwordHash: data.password_hash,
+          completedRides: data.completed_rides,
+          balance: data.balance
+        };
+        setUser(loggedUser);
+        localStorage.setItem('comfort_active_user_id', data.id);
+        await loadBookings(data.id);
+        setLoading(false);
+        return true;
+      }
     }
     setLoading(false);
     return false;
   };
 
-  const register = async (name: string, phone: string, passwordHash: string) => {
+  const register = async (name: string, phone: string, password: string) => {
     setLoading(true);
     
+    // Хешуємо пароль перед записом у базу
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+
     const newUserRow = {
       name,
       phone,
-      password_hash: passwordHash,
+      password_hash: hashedPassword,
       completed_rides: 0,
       balance: 0
     };
