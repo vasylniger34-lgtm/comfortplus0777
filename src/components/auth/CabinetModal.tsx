@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, User, Phone, LogOut, Ticket, XCircle, Gift, CheckCircle, FileText, Bus, Download } from 'lucide-react';
+import { X, User, Phone, LogOut, Ticket, XCircle, Gift, FileText, Bus, Download } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { STOPS } from '../../data/routes';
 import html2canvas from 'html2canvas';
