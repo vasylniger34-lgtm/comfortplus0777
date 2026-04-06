@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react'; // v3.0 stable fix
+
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeftRight, User, Phone, MapPin, ArrowRight, ChevronDown, Clock } from 'lucide-react';
 import { STOPS, getPrice } from '../../data/routes';

@@ -1,4 +1,5 @@
-import { useState, useRef } from 'react';
+import { useState, useRef } from 'react'; // v3.0 stable fix
+
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, User, Phone, LogOut, Ticket, XCircle, Gift, FileText, Bus, Download } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
