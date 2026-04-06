@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Phone, Menu, X, Bus, User } from 'lucide-react';
+import { Phone, Menu, X, User } from 'lucide-react';
 import { CONTACTS } from '../../data/routes';
 import { useAuth } from '../../context/AuthContext';
 
@@ -40,12 +40,10 @@ export default function Header({ onBookNow, onOpenCabinet }: HeaderProps) {
             : 'bg-transparent'
         }`}
       >
-        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           {/* Logo */}
-          <div className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-xl bg-brand-yellow flex items-center justify-center shadow-brand">
-              <Bus size={20} className="text-brand-dark" />
-            </div>
+          <div className="flex items-center gap-3">
+            <img src="/logo.jpg" alt="Comfort Plus" className="w-12 h-12 rounded-xl object-cover shadow-brand" />
             <div>
               <div className="font-display font-bold text-white text-base leading-tight">
                 Comfort Plus
@@ -113,7 +111,7 @@ export default function Header({ onBookNow, onOpenCabinet }: HeaderProps) {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.2 }}
-            className="fixed top-[64px] left-0 right-0 z-40 glass border-b border-brand-border px-4 py-4"
+            className="fixed top-[80px] left-0 right-0 z-40 glass border-b border-brand-border px-4 py-4"
           >
             <nav className="flex flex-col gap-1">
               {navLinks.map((link) => (
