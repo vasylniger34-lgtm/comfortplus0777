@@ -263,59 +263,19 @@ export default function BookingForm({ onPay }: BookingFormProps) {
     }
     setErrors({});
     
-    setIsSubmitting(true);
-    try {
-      const payload = {
-        from: currentRoute.find(s=>s.id===from)?.name || from,
-        to: currentRoute.find(s=>s.id===to)?.name || to,
-        date: date?.toLocaleDateString('uk-UA'),
-        name,
-        phone,
-        seats,
-        departureTime: selectedTime,
-        price: price * seats
-      };
+    const payload = {
+      from: currentRoute.find(s=>s.id===from)?.name || from,
+      to: currentRoute.find(s=>s.id===to)?.name || to,
+      date: date?.toLocaleDateString('uk-UA'),
+      name,
+      phone,
+      seats,
+      departureTime: selectedTime,
+      price: price * seats
+    };
 
-      const response = await fetch(SCRIPT_URL, {
-        method: 'POST',
-        redirect: 'follow',
-        cache: 'no-cache',
-        headers: {
-          'Content-Type': 'text/plain;charset=utf-8',
-        },
-        body: JSON.stringify(payload)
-      });
-
-      const result = await response.json();
-      console.log('Booking Result:', result);
-
-      if (result.result === 'error') {
-        const errorMsg = result.message || 'Помилка запису';
-        if (errorMsg === 'нема місць' || errorMsg === 'No seats' || errorMsg.includes('Недостатньо')) {
-          throw new Error('У вибраному екіпажі більше немає вільних місць.');
-        } else if (errorMsg === 'конфлікт запису' || errorMsg === 'Conflict') {
-          throw new Error('Це місце щойно було заброньоване іншим користувачем. Спробуйте ще раз.');
-        } else if (errorMsg.includes('Unknown time')) {
-          throw new Error('Обраний час не знайдено в системі. Оберіть інший час.');
-        } else {
-          throw new Error(errorMsg);
-        }
-      }
-
-      setSubmitStatus('success');
-      setStatusMessage(`Ваше бронювання на ${selectedTime} успішно додано в таблицю!`);
-      
-      setTimeout(() => {
-        onPay({ from, to, date: date!, name, phone, price: price * seats, seats, departureTime: selectedTime });
-      }, 2500);
-
-    } catch (error: any) {
-      console.error('Sheets Error:', error);
-      setSubmitStatus('error');
-      setStatusMessage(error?.message || 'Сталася помилка при з\'єднанні з таблицею. Спробуйте ще раз.');
-    } finally {
-      setIsSubmitting(false);
-    }
+    // Open payment modal immediately
+    onPay({ from, to, date: date!, name, phone, price: price * seats, seats, departureTime: selectedTime });
   };
 
   const AvailabilityCard = ({ time, isVisible }: { time: string; isVisible: boolean }) => {

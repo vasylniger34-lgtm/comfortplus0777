@@ -21,15 +21,63 @@ export default function PaymentModal({ data, onClose }: PaymentModalProps) {
   const fromStop = STOPS.find(s => s.id === data.from);
   const toStop = STOPS.find(s => s.id === data.to);
 
-  const handlePay = (m: 'applepay' | 'googlepay' | 'card' | 'balance') => {
+  const [errorMsg, setErrorMsg] = useState('');
+  
+  const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxd8ZIMLZdgaOKw7YBmbTK72mCUvy8rmRcOUvqQ2W3vZifJy3wTVbh_q-ikWL1FarXk/exec';
+
+  const handlePay = async (m: 'applepay' | 'googlepay' | 'card' | 'balance') => {
     setMethod(m);
     setStep('processing');
-    setTimeout(() => {
+    setErrorMsg('');
+    
+    // Fake payment processing delay
+    await new Promise(r => setTimeout(r, 1500));
+
+    try {
+      const payload = {
+        from: STOPS.find(s=>s.id===data.from)?.name || data.from,
+        to: STOPS.find(s=>s.id===data.to)?.name || data.to,
+        date: data.date.toLocaleDateString('uk-UA'),
+        name: data.name,
+        phone: data.phone,
+        seats: data.seats,
+        departureTime: data.departureTime,
+        price: data.price
+      };
+
+      const response = await fetch(SCRIPT_URL, {
+        method: 'POST',
+        redirect: 'follow',
+        cache: 'no-cache',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload)
+      });
+      const result = await response.json();
+
+      if (result.result === 'error') {
+        const msg = result.message || 'Помилка';
+        if (msg === 'нема місць' || msg === 'No seats' || msg.includes('Недостатньо')) {
+          throw new Error('У вибраному екіпажі більше немає вільних місць.');
+        } else if (msg === 'конфлікт запису' || msg === 'Conflict') {
+          throw new Error('Це місце щойно було заброньоване. Спробуйте ще раз.');
+        } else if (msg.includes('Unknown time')) {
+          throw new Error('Обраний час не знайдено в системі.');
+        } else {
+          throw new Error(msg);
+        }
+      }
+
+      // Success
       if (m === 'balance' && user) {
         updateBalance(-data.price);
       }
       setStep('success');
-    }, 2200);
+
+    } catch (e: any) {
+      setErrorMsg(e.message || 'Сталася помилка. Перевірте з\'єднання.');
+      // Auto-return to choose step
+      setTimeout(() => setStep('choose'), 3000);
+    }
   };
 
   return (
@@ -173,13 +221,25 @@ export default function PaymentModal({ data, onClose }: PaymentModalProps) {
               exit={{ opacity: 0 }}
               className="flex flex-col items-center justify-center py-16 px-6"
             >
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                className="w-16 h-16 border-4 border-brand-yellow/30 border-t-brand-yellow rounded-full mb-6"
-              />
-              <h3 className="text-white font-display font-bold text-xl mb-2">Обробляємо оплату</h3>
-              <p className="text-brand-muted text-sm text-center">Зачекайте кілька секунд...</p>
+              {errorMsg ? (
+                <>
+                  <div className="w-16 h-16 bg-red-500/10 border-2 border-red-500 rounded-full flex items-center justify-center mb-6 text-red-500">
+                    <X size={32} />
+                  </div>
+                  <h3 className="text-white font-display font-bold text-xl mb-2 text-center">Помилка оформлення</h3>
+                  <p className="text-red-400 text-sm text-center font-medium max-w-[250px]">{errorMsg}</p>
+                </>
+              ) : (
+                <>
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                    className="w-16 h-16 border-4 border-brand-yellow/30 border-t-brand-yellow rounded-full mb-6"
+                  />
+                  <h3 className="text-white font-display font-bold text-xl mb-2">Оформлення квитка</h3>
+                  <p className="text-brand-muted text-sm text-center">Бронюємо місце. Зачекайте кілька секунд...</p>
+                </>
+              )}
             </motion.div>
           )}
 

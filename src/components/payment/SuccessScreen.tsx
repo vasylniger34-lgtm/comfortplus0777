@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { CheckCircle, MessageSquare, Bus, Phone, FileText, Gift, Lock } from 'lucide-react';
+import { CheckCircle, MessageSquare, Bus, Phone, FileText, Gift, Lock, X } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import type { BookingData } from '../booking/BookingForm';
@@ -83,6 +83,14 @@ export default function SuccessScreen({ data, onClose }: SuccessScreenProps) {
       <div className="flex justify-center pt-3 md:hidden">
         <div className="w-10 h-1 bg-brand-border rounded-full" />
       </div>
+      
+      {/* Absolute close button for the modal (visible mainly on desktop or positioned top-right) */}
+      <button
+        onClick={onClose}
+        className="absolute top-4 right-4 z-10 w-8 h-8 flex items-center justify-center rounded-xl bg-brand-surface/50 border border-brand-border text-brand-muted hover:text-white hover:border-brand-yellow hover:bg-brand-surface transition-all"
+      >
+        <X size={18} />
+      </button>
 
       <div className="px-6 pb-6 pt-4">
         <div className="flex flex-col items-center text-center mb-6">
