@@ -151,6 +151,40 @@ export default function BookingForm({ onPay }: BookingFormProps) {
     }
   };
 
+  // 6 crews, each alternating Східниця→Львів and Львів→Східниця throughout the day
+  // Structure: crewNumber → { skhidnytsia_lviv: times[], lviv_skhidnytsia: times[] }
+  const CREWS = [
+    { name: 'Екіпаж №1', skhidnytsia_lviv: ['05:50', '10:35', '15:30'], lviv_skhidnytsia: ['08:10', '13:10', '19:20'] },
+    { name: 'Екіпаж №2', skhidnytsia_lviv: ['06:20', '11:10', '16:20'], lviv_skhidnytsia: ['09:00', '14:10', '20:00'] },
+    { name: 'Екіпаж №3', skhidnytsia_lviv: ['07:10', '12:40', '17:00'], lviv_skhidnytsia: ['10:15', '15:30', '20:40'] },
+    { name: 'Екіпаж №4', skhidnytsia_lviv: ['08:10', '13:20', '17:40'], lviv_skhidnytsia: ['11:05', '16:10'] },
+    { name: 'Екіпаж №5', skhidnytsia_lviv: ['08:50', '14:10'],           lviv_skhidnytsia: ['11:50', '18:20'] },
+    { name: 'Екіпаж №6', skhidnytsia_lviv: ['09:30', '12:00'],           lviv_skhidnytsia: ['12:20', '14:50'] },
+  ];
+
+  // Get departure times for the selected direction
+  const getTimesForDirection = () => {
+    if (directionIndex === null) return [];
+    const key = directionIndex === 0 ? 'lviv_skhidnytsia' : 'skhidnytsia_lviv';
+    const entries: { time: string; crewName: string }[] = [];
+    CREWS.forEach(crew => {
+      crew[key].forEach(time => {
+        entries.push({ time, crewName: crew.name });
+      });
+    });
+    // Sort by time
+    entries.sort((a, b) => a.time.localeCompare(b.time));
+    return entries;
+  };
+
+  const availableDepartures = getTimesForDirection();
+
+  // Get crew name for a given time
+  const getCrewName = (time: string) => {
+    const entry = availableDepartures.find(e => e.time === time);
+    return entry?.crewName || `Екіпаж №${time.replace(':', '')}`;
+  };
+
   const isTimePassed = (time: string) => {
     if (!date) return false;
     const now = new Date();
@@ -161,9 +195,6 @@ export default function BookingForm({ onPay }: BookingFormProps) {
     departureDate.setHours(hours, minutes, 0, 0);
     return departureDate < now;
   };
-
-  const MORNING_TIMES = ['05:50', '06:20', '07:10', '08:10', '08:50', '09:30', '10:35'];
-  const AFTERNOON_TIMES = ['11:10', '12:00', '12:40', '13:20', '14:10', '15:30', '16:20', '17:00', '17:40'];
 
   const handleStopSelect = (stopId: string) => {
     if (!from || (from && to)) {
@@ -329,7 +360,7 @@ export default function BookingForm({ onPay }: BookingFormProps) {
                 <div className="flex items-center gap-2 mb-1">
                     <span className="text-2xl font-display font-black">~{time}</span>
                     <span className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded ${isSelected ? 'bg-brand-dark/10 opacity-70' : 'bg-brand-yellow/10 text-brand-yellow'}`}>
-                        Екіпаж №{time.replace(':', '')}
+                        {getCrewName(time)}
                     </span>
                 </div>
                 <div className={`text-xs font-medium flex items-center gap-1.5 ${isSelected ? 'text-brand-dark/80' : 'text-brand-muted'}`}>
@@ -531,7 +562,7 @@ export default function BookingForm({ onPay }: BookingFormProps) {
                   ) : (
                     <div className="space-y-4">
                       <AnimatePresence mode="popLayout">
-                        {MORNING_TIMES.concat(AFTERNOON_TIMES).map(time => (
+                        {availableDepartures.map(({ time }) => (
                           <AvailabilityCard key={time} time={time} isVisible={showAllCrews} />
                         ))}
                       </AnimatePresence>

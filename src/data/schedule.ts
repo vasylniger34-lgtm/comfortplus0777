@@ -10,7 +10,7 @@ export const SCHEDULE_SKHIDNYTSIA_TO_LVIV: ScheduleEntry[] = [
   { departure: '05:50', arrival: '08:10', fromCity: 'Східниця', toCity: 'Львів' },
   { departure: '06:20', arrival: '09:00', fromCity: 'Східниця', toCity: 'Львів', isPopular: true },
   { departure: '07:10', arrival: '10:15', fromCity: 'Східниця', toCity: 'Львів' },
-  { departure: '08:15', arrival: '11:05', fromCity: 'Східниця', toCity: 'Львів', isPopular: true },
+  { departure: '08:10', arrival: '11:05', fromCity: 'Східниця', toCity: 'Львів', isPopular: true },
   { departure: '08:50', arrival: '11:50', fromCity: 'Східниця', toCity: 'Львів' },
   { departure: '09:30', arrival: '12:20', fromCity: 'Східниця', toCity: 'Львів' },
   { departure: '10:35', arrival: '13:10', fromCity: 'Східниця', toCity: 'Львів' },

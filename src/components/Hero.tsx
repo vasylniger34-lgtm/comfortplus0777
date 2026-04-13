@@ -16,7 +16,8 @@ export default function Hero({ onBookNow }: HeroProps) {
 
   const nextDepartureTime = (() => {
     const now = new Date();
-    const times = ['05:50','06:20','07:10','08:10','08:50','09:30','10:35','11:10','12:00','12:40','13:20','14:10','15:30','16:20','17:00','17:40'];
+    // All departure times from both directions combined
+    const times = ['05:50','06:20','07:10','08:10','08:50','09:00','09:30','10:15','10:35','11:05','11:10','11:50','12:00','12:20','12:40','13:10','13:20','14:10','14:50','15:30','16:10','16:20','17:00','17:40','18:20','19:20','20:00','20:40'];
     const currentMins = now.getHours() * 60 + now.getMinutes();
     const next = times.find(t => {
       const [h, m] = t.split(':').map(Number);
