@@ -1,12 +1,15 @@
 import { motion } from 'framer-motion';
-import { ArrowRight, ChevronDown, Zap, Bus, Thermometer, Wifi } from 'lucide-react';
+import { ArrowRight, ChevronDown, Zap, Bus, Thermometer, Wifi, ArrowLeftRight } from 'lucide-react';
 import { CONTACTS } from '../data/routes';
+
+import { useState } from 'react';
 
 interface HeroProps {
   onBookNow: () => void;
 }
 
 export default function Hero({ onBookNow }: HeroProps) {
+  const [isHovered, setIsHovered] = useState(false);
   const comfortFeatures = [
     { icon: Bus, label: 'MB Sprinter & VW Crafter', desc: 'Сучасний автопарк' },
     { icon: Thermometer, label: 'Клімат-контроль', desc: 'Комфорт у будь-яку погоду' },
@@ -58,24 +61,43 @@ export default function Hero({ onBookNow }: HeroProps) {
           </div>
         </motion.div>
 
-        {/* Main heading */}
+        {/* Main heading (Interactive) */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.1 }}
-          className="text-center mb-8"
+          className="text-center mb-10 flex flex-col items-center"
         >
-          <h1 className="font-display font-bold text-4xl md:text-5xl lg:text-6xl text-white leading-tight mb-4">
-            Львів
-            <span className="inline-block mx-3 md:mx-4">
-              <ArrowRight size={32} className="text-brand-yellow inline -mt-1" />
-            </span>
-            Східниця
-          </h1>
-          <p className="text-brand-light text-lg md:text-xl max-w-xl mx-auto leading-relaxed">
+          <div 
+            className="relative cursor-pointer group flex flex-col items-center mb-6"
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+            onClick={() => setIsHovered(!isHovered)}
+          >
+            <h1 className="font-display font-bold text-4xl md:text-6xl text-white leading-tight flex items-center justify-center gap-3 md:gap-4 transition-transform duration-300">
+              <span className="relative z-10 bg-brand-dark px-1">Львів</span>
+              <div className="relative flex items-center justify-center">
+                <ArrowLeftRight size={32} className={`text-brand-yellow transition-all duration-300 ${isHovered ? 'opacity-0 scale-50' : 'opacity-100 scale-100'}`} />
+                <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-0.5 bg-brand-yellow transition-all duration-300 ease-out ${isHovered ? 'w-32 md:w-48 opacity-50' : 'w-0 opacity-0'}`} />
+              </div>
+              <span className="relative z-10 bg-brand-dark px-1">Східниця</span>
+            </h1>
+            
+            <div className="absolute -bottom-8 w-full flex justify-center">
+              <div className={`transition-all duration-300 ease-out flex items-center justify-center gap-2 md:gap-4 text-xs md:text-sm font-semibold tracking-wide uppercase text-white/80 ${isHovered ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4 pointer-events-none'}`}>
+                <span className="shrink-0 text-brand-yellow">Стебник</span>
+                <span className="w-1 h-1 rounded-full bg-brand-muted shrink-0" />
+                <span className="shrink-0 text-brand-yellow">Трускавець</span>
+                <span className="w-1 h-1 rounded-full bg-brand-muted shrink-0" />
+                <span className="shrink-0 text-brand-yellow">Борислав</span>
+              </div>
+            </div>
+          </div>
+          
+          <p className="text-brand-light text-lg md:text-xl max-w-xl mx-auto leading-relaxed mt-4">
             Комфортні пасажирські перевезення
             <br />
-            <span className="text-brand-muted text-base italic">щоденно · без вихідних · від 50 грн</span>
+            <span className="text-brand-yellow font-medium italic">щоденно · в обох напрямках</span>
           </p>
         </motion.div>
 
@@ -128,10 +150,10 @@ export default function Hero({ onBookNow }: HeroProps) {
               <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-4 border-t border-brand-border/50">
                 <div className="flex gap-6 sm:gap-8">
                   <div>
-                    <div className="text-brand-muted text-[10px] uppercase font-bold tracking-widest mb-1 opacity-50">Ціна від</div>
+                    <div className="text-brand-muted text-[10px] uppercase font-bold tracking-widest mb-1 opacity-50">Комфорт</div>
                     <div className="flex items-baseline gap-1">
-                      <span className="text-brand-yellow font-display font-black text-3xl">50</span>
-                      <span className="text-brand-yellow text-sm font-bold uppercase">грн</span>
+                      <span className="text-brand-yellow font-display font-bold text-xl sm:text-2xl">Premium</span>
+                      <span className="text-brand-yellow text-sm font-bold uppercase">клас</span>
                     </div>
                   </div>
                   <div>
