@@ -63,32 +63,103 @@ export default function Hero({ onBookNow }: HeroProps) {
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.3 }}
-              className="text-brand-light text-lg leading-relaxed mb-6"
+              className="text-brand-light text-lg leading-relaxed mb-8"
             >
-              Львів ↔ Стебник ↔ Трускавець ↔ Борислав ↔ Східниця
+              Щоденні пасажирські перевезення сучасними мікроавтобусами.
               <br />
-              <span className="text-brand-muted text-base">MB Sprinter та VW Crafter · по 12 місць · Клімат-контроль</span>
+              <span className="text-brand-muted text-base italic opacity-80">MB Sprinter та VW Crafter · Клімат-контроль · Wi-Fi</span>
             </motion.p>
 
+            {/* NEW: Prominent Route Card at the Top */}
             <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.4 }}
-              className="flex flex-wrap gap-3 mb-8"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.5, delay: 0.4 }}
+              className="mb-8 relative"
             >
-              <button
-                onClick={onBookNow}
-                className="btn-primary flex items-center gap-2 text-base"
-              >
-                Забронювати місце
-                <ArrowRight size={18} />
-              </button>
-              <a
-                href={`tel:${CONTACTS.phone1}`}
-                className="btn-ghost flex items-center gap-2 text-base"
-              >
-                Зателефонувати
-              </a>
+              <div className="card p-6 md:p-8 bg-brand-surface/40 backdrop-blur-xl border-brand-yellow/20 shadow-2xl relative overflow-hidden group">
+                {/* Decorative glow */}
+                <div className="absolute -top-24 -right-24 w-48 h-48 bg-brand-yellow/10 rounded-full blur-3xl group-hover:bg-brand-yellow/20 transition-colors duration-700" />
+                
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between mb-8">
+                    <div className="flex items-center gap-3">
+                      <div className="w-2 h-2 bg-brand-yellow rounded-full animate-pulse" />
+                      <div className="text-brand-muted text-[10px] uppercase tracking-[0.2em] font-black">
+                        Маршрут сьогодні
+                      </div>
+                    </div>
+                    <div className="bg-brand-yellow/10 px-3 py-1 rounded-full border border-brand-yellow/20">
+                      <span className="text-brand-yellow text-[10px] font-bold uppercase tracking-tighter">Live Розклад</span>
+                    </div>
+                  </div>
+                  
+                  {/* Horizontal Route Visualization for Desktop, Vertical for Mobile */}
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 relative">
+                    {/* Background Line */}
+                    <div className="absolute left-[7px] sm:left-0 sm:top-[7px] w-0.5 h-full sm:w-full sm:h-0.5 bg-brand-border -z-10" />
+                    
+                    {['Львів', 'Стебник', 'Трускавець', 'Борислав', 'Східниця'].map((stop, idx, arr) => (
+                      <div key={stop} className="flex flex-row sm:flex-col items-center gap-3 sm:gap-2 flex-1 group/stop">
+                        <div className={`w-4 h-4 rounded-full border-2 z-10 transition-all duration-300 ${
+                          idx === 0 || idx === arr.length - 1
+                            ? 'bg-brand-yellow border-brand-yellow shadow-brand scale-110'
+                            : 'bg-brand-dark border-brand-border group-hover/stop:border-brand-yellow'
+                        }`} />
+                        <div className="flex flex-col sm:items-center">
+                          <div className={`font-display font-black text-xs sm:text-[11px] uppercase tracking-tighter ${
+                            idx === 0 || idx === arr.length - 1 ? 'text-brand-yellow' : 'text-white/90'
+                          }`}>
+                            {stop}
+                          </div>
+                          {idx < arr.length - 1 && (
+                            <div className="text-[9px] font-bold text-brand-muted opacity-60 sm:mt-1">
+                              {idx === 0 ? '~25 хв' : idx === 1 ? '~10 хв' : idx === 2 ? '~8 хв' : '~15 хв'}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  <div className="mt-10 pt-6 border-t border-brand-border/50 flex flex-wrap justify-between items-end gap-6">
+                    <div className="flex gap-8">
+                      <div>
+                        <div className="text-brand-muted text-[10px] uppercase font-bold tracking-widest mb-1 opacity-50">Ціна від</div>
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-brand-yellow font-display font-black text-3xl">50</span>
+                          <span className="text-brand-yellow text-sm font-bold uppercase">грн</span>
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-brand-muted text-[10px] uppercase font-bold tracking-widest mb-1 opacity-50">Наступний рейс</div>
+                        <div className="bg-white/5 px-3 py-1.5 rounded-lg border border-white/10">
+                          <span className="text-white font-display font-black text-xl">
+                            {(() => {
+                              const now = new Date();
+                              const times = ['05:50','06:20','07:10','08:15','08:50','09:30','10:35','11:10','12:00','12:40','13:20','14:10','15:30','16:20','17:00','17:40'];
+                              const currentMins = now.getHours() * 60 + now.getMinutes();
+                              const next = times.find(t => {
+                                const [h, m] = t.split(':').map(Number);
+                                return h * 60 + m > currentMins;
+                              });
+                              return next || '05:50';
+                            })()}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <button
+                      onClick={onBookNow}
+                      className="btn-primary px-8 py-4 text-dark font-black flex items-center gap-3 group/btn shadow-brand-lg"
+                    >
+                      ЗАБРОНЮВАТИ ЗАРАЗ
+                      <ArrowRight size={20} className="group-hover/btn:translate-x-1 transition-transform" />
+                    </button>
+                  </div>
+                </div>
+              </div>
             </motion.div>
 
             {/* Stats */}
@@ -96,102 +167,44 @@ export default function Hero({ onBookNow }: HeroProps) {
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.5 }}
-              className="flex gap-6"
+              className="flex gap-8 opacity-60 grayscale hover:grayscale-0 transition-all duration-500"
             >
               {stats.map(({ label, value }) => (
                 <div key={label} className="flex flex-col">
-                  <span className="text-brand-yellow font-display font-bold text-2xl">{value}</span>
-                  <span className="text-brand-muted text-xs">{label}</span>
+                  <span className="text-brand-yellow font-display font-extrabold text-xl">{value}</span>
+                  <span className="text-brand-muted text-[10px] uppercase tracking-tighter">{label}</span>
                 </div>
               ))}
             </motion.div>
           </div>
 
-          {/* Right: Route visualization */}
+          {/* Right Column: Modern Sprinter Badge */}
           <motion.div
             initial={{ opacity: 0, x: 40 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.7, delay: 0.3 }}
-            className="hidden lg:block"
+            className="hidden lg:flex justify-center"
           >
-            <div className="relative">
-              {/* Bus illustration */}
-              <div className="card p-8 relative overflow-hidden">
-                {/* Shimmer effect */}
-                <div className="absolute inset-0 shimmer-bg pointer-events-none rounded-2xl" />
-                
-                {/* Route stops */}
-                <div className="relative z-10">
-                  <div className="text-brand-muted text-xs uppercase tracking-widest mb-6 font-medium">
-                    Маршрут сьогодні
-                  </div>
-                  
-                  {['Львів', 'Стебник', 'Трускавець', 'Борислав', 'Східниця'].map((stop, idx, arr) => (
-                    <div key={stop} className="flex items-center gap-4 group hover:bg-brand-dark/50 p-2 -mx-2 rounded-xl cursor-default transition-all duration-300">
-                      <div className="flex flex-col items-center">
-                        <motion.div
-                          initial={{ scale: 0 }}
-                          animate={{ scale: 1 }}
-                          transition={{ delay: 0.5 + idx * 0.1 }}
-                          className={`w-4 h-4 rounded-full border-2 transition-all duration-300 group-hover:bg-brand-gold group-hover:border-brand-gold group-hover:shadow-brand ${
-                            idx === 0 || idx === arr.length - 1
-                              ? 'bg-brand-yellow border-brand-yellow shadow-brand'
-                              : 'bg-brand-dark border-brand-yellow/50'
-                          }`}
-                        />
-                        {idx < arr.length - 1 && (
-                          <div className="w-0.5 h-8 bg-gradient-to-b from-brand-yellow/60 to-brand-yellow/20 my-1" />
-                        )}
+            <div className="relative group">
+               <div className="absolute inset-0 bg-brand-yellow/5 rounded-full blur-3xl group-hover:bg-brand-yellow/10 transition-colors duration-1000" />
+               <div className="relative z-10 card p-1 scale-110 border-brand-yellow/20 overflow-hidden rotate-2 group-hover:rotate-0 transition-transform duration-700">
+                  <div className="bg-brand-dark p-6 rounded-[14px]">
+                    <div className="flex flex-col items-center gap-4">
+                      <div className="w-48 h-32 bg-brand-surface/40 rounded-xl flex items-center justify-center border border-white/5">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-24 h-24 text-brand-yellow/40">
+                          <path d="M3 9l2-2h14l2 2" />
+                          <path d="M5 7L3 18h18l-2-11" />
+                          <circle cx="7" cy="18" r="2" />
+                          <circle cx="17" cy="18" r="2" />
+                        </svg>
                       </div>
-                      <div className="py-2 transform group-hover:translate-x-2 transition-transform duration-300">
-                        <div className={`font-semibold transition-colors duration-300 group-hover:text-brand-gold ${
-                          idx === 0 || idx === arr.length - 1 ? 'text-brand-yellow text-base' : 'text-white text-sm'
-                        }`}>
-                          {stop}
-                        </div>
-                        {idx < arr.length - 1 && (
-                          <div className="text-brand-muted text-xs">
-                            {idx === 0 ? '~25 хв' : idx === 1 ? '~10 хв' : idx === 2 ? '~8 хв' : '~15 хв'}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                  
-                  <div className="mt-6 pt-6 border-t border-brand-border">
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <div className="text-brand-muted text-xs">Ціна від</div>
-                        <div className="text-brand-yellow font-display font-bold text-2xl">50 грн</div>
-                      </div>
-                      <div>
-                        <div className="text-brand-muted text-xs">Наступний рейс</div>
-                        <div className="text-white font-semibold text-lg">
-                          {(() => {
-                            const now = new Date();
-                            const times = ['05:50','06:20','07:10','08:15','08:50','09:30','10:35','11:10','12:00','12:40','13:20','14:10','15:30','16:20','17:00','17:40'];
-                            const currentMins = now.getHours() * 60 + now.getMinutes();
-                            const next = times.find(t => {
-                              const [h, m] = t.split(':').map(Number);
-                              return h * 60 + m > currentMins;
-                            });
-                            return next || '05:50';
-                          })()}
-                        </div>
+                      <div className="text-center">
+                        <div className="text-brand-yellow font-display font-black text-lg">VIP ПЕРЕВЕЗЕННЯ</div>
+                        <div className="text-brand-muted text-xs">MB Sprinter 2024</div>
                       </div>
                     </div>
                   </div>
-                </div>
-              </div>
-
-              {/* Floating badge */}
-              <motion.div
-                animate={{ y: [0, -6, 0] }}
-                transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-                className="absolute -top-4 -right-4 bg-brand-yellow text-brand-dark rounded-2xl px-4 py-2 font-display font-medium text-xs shadow-brand-lg text-center"
-              >
-                MB Sprinter<br/>VW Crafter
-              </motion.div>
+               </div>
             </div>
           </motion.div>
         </div>
@@ -212,6 +225,7 @@ export default function Hero({ onBookNow }: HeroProps) {
           </motion.div>
         </motion.div>
       </div>
+
     </section>
   );
 }

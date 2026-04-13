@@ -78,9 +78,6 @@ function MainAppMockup() {
 
   return (
     <div className="min-h-screen bg-brand-dark">
-      <div className="bg-brand-yellow/10 border-b border-brand-yellow/20 text-brand-yellow text-[10px] uppercase font-bold py-1 text-center tracking-widest">
-        Режим мокапу: Експериментальний дизайн
-      </div>
       <Header 
         onBookNow={scrollToBooking} 
         onOpenCabinet={() => user ? setIsCabinetOpen(true) : setIsAuthOpen(true)}

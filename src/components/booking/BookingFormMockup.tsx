@@ -97,7 +97,7 @@ export default function BookingFormMockup({ onPay }: BookingFormProps) {
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [statusMessage, setStatusMessage] = useState('');
 
-  const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxqZBUF__yX2N0Sljl6wZKBD0Nlt89Vsr7QCfX4Du0CdLwGuWTWhb-YIz01R11wXjQ3/exec';
+  const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzUs4oJhJm3Z1krIyA1Z7IYv3_B3tOhBYF_VjDBEC_dBolbM0sLjEaKbiwwJQKtgRBi/exec';
 
   const price = getPrice(from, to);
   const currentRoute = directionIndex === 0 ? ROUTE_LVIV_TO_SKHIDNYTSIA : ROUTE_SKHIDNYTSIA_TO_LVIV;
@@ -198,15 +198,22 @@ export default function BookingFormMockup({ onPay }: BookingFormProps) {
         price: price * seats
       };
 
-      await fetch(SCRIPT_URL, {
+      const response = await fetch(SCRIPT_URL, {
         method: 'POST',
-        mode: 'no-cors',
+        redirect: 'follow',
         cache: 'no-cache',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'text/plain;charset=utf-8',
         },
         body: JSON.stringify(payload)
       });
+
+      const result = await response.json();
+      console.log('Booking Result:', result);
+
+      if (result.result && result.result.includes('Error')) {
+        throw new Error(result.result);
+      }
 
       setSubmitStatus('success');
       setStatusMessage(`Ваше бронювання на ${selectedTime} успішно додано в таблицю!`);

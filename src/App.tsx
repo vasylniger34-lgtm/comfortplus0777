@@ -85,9 +85,9 @@ function MainApp() {
       
       <main>
         <Hero onBookNow={scrollToBooking} />
+        <BookingForm onPay={setPaymentData} />
         <FeaturesSection />
         <ScheduleBlock />
-        <BookingForm onPay={setPaymentData} />
         <TransfersBlock />
         <ReviewsBlock />
       </main>

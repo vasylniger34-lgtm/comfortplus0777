@@ -21,27 +21,32 @@ export const STOPS: Stop[] = [
 ];
 
 export const ROUTE_PRICES: Record<string, number> = {
+  // Routes available for online booking
   'lviv-stebnik': 200,
-  'lviv-truskavets': 230,
+  'lviv-truskavets': 250,
   'lviv-boryslav': 250,
-  'lviv-skhidnytsia': 350,
-  'stebnik-truskavets': 50,
-  'stebnik-boryslav': 70,
-  'stebnik-skhidnytsia': 150,
-  'truskavets-boryslav': 40,
-  'truskavets-skhidnytsia': 120,
-  'boryslav-skhidnytsia': 90,
-  // Reverse routes
+  'lviv-skhidnytsia': 300,
+  
   'stebnik-lviv': 200,
-  'truskavets-lviv': 230,
+  'truskavets-lviv': 250,
   'boryslav-lviv': 250,
-  'skhidnytsia-lviv': 350,
-  'truskavets-stebnik': 50,
-  'boryslav-stebnik': 70,
-  'skhidnytsia-stebnik': 150,
-  'boryslav-truskavets': 40,
-  'skhidnytsia-truskavets': 120,
-  'skhidnytsia-boryslav': 90,
+  'skhidnytsia-lviv': 300,
+
+  // Routes bookable only by phone (setting price to 0 or keeping for reference, 
+  // but logic in form should redirect to phone)
+  'skhidnytsia-truskavets': 0,
+  'skhidnytsia-stebnik': 0,
+  'stebnik-skhidnytsia': 0,
+  'truskavets-skhidnytsia': 0,
+
+  // Forbidden routes (not bookable)
+  'skhidnytsia-boryslav': 0,
+  'boryslav-truskavets': 0,
+  'boryslav-stebnik': 0,
+  'truskavets-stebnik': 0,
+  'stebnik-truskavets': 0,
+  'stebnik-boryslav': 0,
+  'boryslav-skhidnytsia': 0,
 };
 
 export const ROUTE_DURATIONS: Record<string, string> = {

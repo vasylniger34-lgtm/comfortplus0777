@@ -1,8 +1,7 @@
-import { useState, useRef, useEffect } from 'react'; // v3.0 stable fix
-
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeftRight, User, Phone, MapPin, ArrowRight, ChevronDown, Clock } from 'lucide-react';
-import { STOPS, getPrice } from '../../data/routes';
+import { User, Phone, ArrowRight, X, ChevronRight, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
+import { getPrice, CONTACTS } from '../../data/routes';
 import { useAuth } from '../../context/AuthContext';
 
 import DatePicker from './DatePicker';
@@ -22,94 +21,108 @@ export interface BookingData {
   departureTime: string;
 }
 
-function StopSelect({
-  value,
-  onChange,
-  excludeId,
-  label,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  excludeId?: string;
-  label: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+const ROUTE_LVIV_TO_SKHIDNYTSIA = [
+  { id: 'lviv', name: 'Львів' },
+  { id: 'stebnik', name: 'Стебник' },
+  { id: 'truskavets', name: 'Трускавець' },
+  { id: 'boryslav', name: 'Борислав' },
+  { id: 'skhidnytsia', name: 'Східниця' },
+];
 
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
+const ROUTE_SKHIDNYTSIA_TO_LVIV = [
+  { id: 'skhidnytsia', name: 'Східниця' },
+  { id: 'boryslav', name: 'Борислав' },
+  { id: 'truskavets', name: 'Трускавець' },
+  { id: 'stebnik', name: 'Стебник' },
+  { id: 'lviv', name: 'Львів' },
+];
 
-  const selected = STOPS.find(s => s.id === value);
-  const options = STOPS.filter(s => s.id !== excludeId);
-
+// Custom Sprinter Taxi Icon
+function SprinterTaxiIcon({ className }: { className?: string }) {
   return (
-    <div ref={ref} className="relative">
-      <div className="label mb-2">{label}</div>
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className="input-field flex items-center gap-3 cursor-pointer"
-      >
-        <MapPin size={18} className="text-brand-yellow flex-shrink-0" />
-        <span className={`flex-1 text-left ${selected ? 'text-white' : 'text-brand-muted'}`}>
-          {selected ? selected.name : 'Оберіть місто'}
-        </span>
-        <ChevronDown
-          size={16}
-          className={`text-brand-muted transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
-        />
-      </button>
-
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 6 }}
-            transition={{ duration: 0.15 }}
-            className="absolute top-full left-0 right-0 mt-1 z-50 card overflow-hidden shadow-card-hover"
-          >
-            {options.map((stop) => (
-              <button
-                key={stop.id}
-                type="button"
-                onClick={() => { onChange(stop.id); setOpen(false); }}
-                className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-all duration-150
-                  hover:bg-brand-yellow/10 hover:text-brand-yellow
-                  ${value === stop.id ? 'bg-brand-yellow/10 text-brand-yellow' : 'text-brand-light'}
-                  border-b border-brand-border last:border-0
-                `}
-              >
-                <div className={`w-2 h-2 rounded-full ${value === stop.id ? 'bg-brand-yellow' : 'bg-brand-border'}`} />
-                <span className="font-medium">{stop.name}</span>
-              </button>
-            ))}
-          </motion.div>
-        )}
-      </AnimatePresence>
+    <div className={`relative flex flex-col items-center ${className}`}>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-10 h-7 text-brand-yellow">
+        {/* Van body */}
+        <path d="M2 17h20v-4l-3-4H7l-3 4v4z" />
+        <path d="M7 9V7a1 1 0 011-1h8a1 1 0 011 1v2" />
+        <rect x="8" y="10" width="8" height="3" fill="currentColor" fillOpacity="0.2" />
+        <circle cx="7" cy="17" r="2" />
+        <circle cx="17" cy="17" r="2" />
+      </svg>
+      <div className="bg-brand-yellow text-brand-dark text-[9px] font-black px-1.5 py-0.5 rounded-sm -mt-0.5 tracking-tighter uppercase shadow-sm">таксі</div>
     </div>
+  );
+}
+
+function CallUsModal({ onClose }: { onClose: () => void }) {
+  return (
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-brand-dark/80 backdrop-blur-sm"
+    >
+      <motion.div 
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+        className="card max-w-sm w-full p-6 text-center shadow-2xl border-brand-yellow/30"
+      >
+        <div className="w-16 h-16 bg-brand-yellow/10 rounded-full flex items-center justify-center mx-auto mb-4 text-brand-yellow">
+          <Phone size={32} />
+        </div>
+        <h3 className="text-xl font-display font-bold text-white mb-2">Зателефонуйте нам</h3>
+        <p className="text-brand-muted text-sm mb-6 leading-relaxed">
+          Бронювання поїздок на короткі відстані здійснюється виключно за телефоном.
+        </p>
+        <div className="space-y-3">
+          <a href={`tel:${CONTACTS.phone1}`} className="btn-primary w-full flex items-center justify-center gap-2 text-dark font-bold">
+            <Phone size={18} />
+            {CONTACTS.phone1Display}
+          </a>
+          <a href={`tel:${CONTACTS.phone2}`} className="btn-primary w-full flex items-center justify-center gap-2 text-dark font-bold">
+            <Phone size={18} />
+            {CONTACTS.phone2Display}
+          </a>
+        </div>
+        <button 
+          onClick={onClose}
+          className="mt-6 text-brand-muted hover:text-white transition-colors text-xs uppercase tracking-widest font-bold flex items-center justify-center gap-1 mx-auto"
+        >
+          <X size={14} /> Закрити
+        </button>
+      </motion.div>
+    </motion.div>
   );
 }
 
 export default function BookingForm({ onPay }: BookingFormProps) {
   const { user } = useAuth();
-  const [from, setFrom] = useState('lviv');
-  const [to, setTo] = useState('skhidnytsia');
+  
+  const [directionIndex, setDirectionIndex] = useState<number | null>(null);
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
   const [date, setDate] = useState<Date | null>(null);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('+380');
   const [seats, setSeats] = useState(1);
   const [selectedTime, setSelectedTime] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showCallModal, setShowCallModal] = useState(false);
+  
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [statusMessage, setStatusMessage] = useState('');
+
+  // Availability from Google Sheets
+  const [availability, setAvailability] = useState<Record<string, any[]>>({});
+  const [isLoadingAvailability, setIsLoadingAvailability] = useState(false);
+
+  const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxd8ZIMLZdgaOKw7YBmbTK72mCUvy8rmRcOUvqQ2W3vZifJy3wTVbh_q-ikWL1FarXk/exec';
 
   const price = getPrice(from, to);
+  const currentRoute = directionIndex === 0 ? ROUTE_LVIV_TO_SKHIDNYTSIA : ROUTE_SKHIDNYTSIA_TO_LVIV;
 
-  // Автозаповнення даних з профілю
   useEffect(() => {
     if (user && !name && phone === '+380') {
       setName(user.name);
@@ -117,27 +130,59 @@ export default function BookingForm({ onPay }: BookingFormProps) {
     }
   }, [user]);
 
-  // Перевірка чи час відправлення вже минув (для сьогодні)
-  const isTimeDisabled = (time: string) => {
+  // Fetch availability when date changes
+  useEffect(() => {
+    if (date) {
+      fetchAvailability();
+    }
+  }, [date]);
+
+  const fetchAvailability = async () => {
+    setIsLoadingAvailability(true);
+    try {
+      const res = await fetch(SCRIPT_URL);
+      const data = await res.json();
+      setAvailability(data);
+    } catch (err) {
+      console.error('Failed to fetch availability:', err);
+    } finally {
+      setIsLoadingAvailability(false);
+    }
+  };
+
+  const isTimePassed = (time: string) => {
     if (!date) return false;
     const now = new Date();
     const isToday = date.toDateString() === now.toDateString();
     if (!isToday) return false;
-
     const [hours, minutes] = time.split(':').map(Number);
     const departureDate = new Date(date);
     departureDate.setHours(hours, minutes, 0, 0);
-    
     return departureDate < now;
   };
 
   const MORNING_TIMES = ['05:50', '06:20', '07:10', '08:15', '08:50', '09:30', '10:35'];
   const AFTERNOON_TIMES = ['11:10', '12:00', '12:40', '13:20', '14:10', '15:30', '16:20', '17:00', '17:40'];
 
-  const swapStops = () => {
-    const temp = from;
-    setFrom(to);
-    setTo(temp);
+  const handleStopSelect = (stopId: string) => {
+    if (!from || (from && to)) {
+      setFrom(stopId);
+      setTo('');
+      setSelectedTime('');
+    } else {
+      const fromIdx = currentRoute.findIndex(s => s.id === from);
+      const toIdx = currentRoute.findIndex(s => s.id === stopId);
+      
+      if (toIdx > fromIdx) {
+        setTo(stopId);
+        // Перевірка на короткий маршрут (тільки за телефоном)
+        const isShort = from !== 'lviv' && stopId !== 'lviv';
+        if (isShort) setShowCallModal(true);
+      } else {
+        setFrom(stopId);
+        setTo('');
+      }
+    }
   };
 
   const formatPhone = (val: string) => {
@@ -154,203 +199,383 @@ export default function BookingForm({ onPay }: BookingFormProps) {
 
   const validate = () => {
     const errs: Record<string, string> = {};
-    if (!from) errs.from = "Оберіть місто відправлення";
-    if (!to) errs.to = "Оберіть місто призначення";
-    if (from === to) errs.to = "Місто призначення має відрізнятися";
+    if (!from || !to) errs.route = "Оберіть маршрут (Звідки та Куди)";
     if (!date) errs.date = "Оберіть дату";
     if (!selectedTime) errs.time = "Оберіть час";
-    if (!name.trim() || name.trim().length < 2) errs.name = "Введіть ваше повне ім'я";
+    if (!name.trim() || name.trim().length < 2) errs.name = "Введіть ім'я";
     const phoneDigits = phone.replace(/\D/g, '');
-    if (phoneDigits.length < 12) errs.phone = "Введіть коректний номер телефону";
+    if (phoneDigits.length < 12) errs.phone = "Введіть коректний номер";
     return errs;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    const isShortTrip = (from !== 'lviv' && to !== 'lviv');
+    const isForbidden = (price === 0);
+
+    if (isForbidden && from && to) {
+        setErrors({ route: "Даний маршрут недоступний для бронювання." });
+        return;
+    }
+
+    if (isShortTrip && from !== '') {
+        setShowCallModal(true);
+        return;
+    }
+
     const errs = validate();
     if (Object.keys(errs).length > 0) {
       setErrors(errs);
       return;
     }
     setErrors({});
-    onPay({ from, to, date: date!, name, phone, price: price * seats, seats, departureTime: selectedTime });
+    
+    setIsSubmitting(true);
+    try {
+      const payload = {
+        from: currentRoute.find(s=>s.id===from)?.name || from,
+        to: currentRoute.find(s=>s.id===to)?.name || to,
+        date: date?.toLocaleDateString('uk-UA'),
+        name,
+        phone,
+        seats,
+        departureTime: selectedTime,
+        price: price * seats
+      };
+
+      const response = await fetch(SCRIPT_URL, {
+        method: 'POST',
+        redirect: 'follow',
+        cache: 'no-cache',
+        headers: {
+          'Content-Type': 'text/plain;charset=utf-8',
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const result = await response.json();
+      console.log('Booking Result:', result);
+
+      if (result.result === 'error') {
+        const errorMsg = result.message || 'Помилка запису';
+        if (errorMsg === 'нема місць') {
+          throw new Error('У вибраному екіпажі більше немає вільних місць.');
+        } else if (errorMsg === 'конфлікт запису') {
+          throw new Error('Це місце щойно було заброньоване іншим користувачем. Спробуйте ще раз.');
+        } else {
+          throw new Error(errorMsg);
+        }
+      }
+
+      setSubmitStatus('success');
+      setStatusMessage(`Ваше бронювання на ${selectedTime} успішно додано в таблицю!`);
+      
+      setTimeout(() => {
+        onPay({ from, to, date: date!, name, phone, price: price * seats, seats, departureTime: selectedTime });
+      }, 2500);
+
+    } catch (error) {
+      console.error('Sheets Error:', error);
+      setSubmitStatus('error');
+      setStatusMessage('Сталася помилка при з\'єднанні з таблицею. Спробуйте ще раз.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
+
+  const AvailabilityCard = ({ time }: { time: string }) => {
+    const passed = isTimePassed(time);
+    if (passed) return null;
+    
+    const isSelected = selectedTime === time;
+    const timeData = availability[time] || [];
+    const freeSeats = timeData.length > 0 ? timeData.filter(s => !s.name).length : 8;
+
+    return (
+      <button
+        type="button"
+        onClick={() => { setSelectedTime(time); setErrors(e => ({ ...e, time: '' })); }}
+        className={`relative flex items-center justify-between p-5 rounded-2xl border transition-all duration-200 text-left w-full
+          ${isSelected 
+            ? 'bg-brand-yellow text-brand-dark border-brand-yellow shadow-brand scale-[1.01]' 
+            : 'bg-brand-surface border-brand-border hover:border-brand-yellow/40 hover:bg-brand-yellow/5 group'
+          }
+        `}
+      >
+        <div className="flex items-center gap-6">
+            <div className={`p-1 rounded-xl flex items-center justify-center ${isSelected ? 'bg-brand-dark/10' : 'text-brand-yellow'}`}>
+              <SprinterTaxiIcon />
+            </div>
+            <div className="flex flex-col">
+                <div className="flex items-center gap-2 mb-1">
+                    <span className="text-2xl font-display font-black">~{time}</span>
+                    <span className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded ${isSelected ? 'bg-brand-dark/10 opacity-70' : 'bg-brand-yellow/10 text-brand-yellow'}`}>
+                        Екіпаж №{time.replace(':', '')}
+                    </span>
+                </div>
+                <div className={`text-xs font-medium flex items-center gap-1.5 ${isSelected ? 'text-brand-dark/80' : 'text-brand-muted'}`}>
+                   Орієнтовний час готовності <span className="opacity-40">•</span> <User size={12} className="inline mr-0.5" />{freeSeats} місць
+                </div>
+            </div>
+        </div>
+        <div className="flex items-center gap-4">
+            <div className="text-right hidden sm:block">
+                <div className={`text-[10px] uppercase font-black tracking-tighter ${isSelected ? 'text-brand-dark/60' : 'text-green-500'}`}>Статус: Вільний</div>
+                <div className={`text-xs font-bold ${isSelected ? 'text-brand-dark' : 'text-white'}`}>Готовий до виїзду</div>
+            </div>
+            <div className={`w-3 h-3 rounded-full pulse ${isSelected ? 'bg-brand-dark' : 'bg-green-500'}`} />
+        </div>
+        {isSelected && (
+          <div className="absolute -top-2 -right-2 transform transition-transform">
+             <div className="bg-brand-dark text-brand-yellow p-1.5 rounded-full shadow-lg border border-brand-yellow/20">
+                <ArrowRight size={16} />
+             </div>
+          </div>
+        )}
+      </button>
+    );
+  };
+
+  const isForbidden = from && to && price === 0;
 
   return (
     <section id="booking" className="max-w-6xl mx-auto px-4 py-16">
+      <AnimatePresence>{showCallModal && <CallUsModal onClose={() => setShowCallModal(false)} />}</AnimatePresence>
+
       <motion.div
         initial={{ opacity: 0, y: 30 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
-        transition={{ duration: 0.5, delay: 0.1 }}
-        className="max-w-2xl mx-auto"
+        transition={{ duration: 0.5 }}
+        className="max-w-4xl mx-auto"
       >
-        <form onSubmit={handleSubmit} className="card p-6 md:p-8 space-y-6">
-          <div className="grid md:grid-cols-[1fr,auto,1fr] gap-4 items-end">
-            <StopSelect value={from} onChange={setFrom} excludeId={to} label="Звідки" />
-            <button type="button" onClick={swapStops} className="p-3 rounded-full bg-brand-surface border border-brand-border text-brand-yellow hover:bg-brand-yellow/10 transition-colors">
-              <ArrowLeftRight size={20} />
-            </button>
-            <StopSelect value={to} onChange={setTo} excludeId={from} label="Куди" />
-          </div>
-
-          <div>
-            <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
-              <div className="w-6 h-6 rounded-full bg-brand-yellow/20 flex items-center justify-center text-brand-yellow text-xs font-bold">2</div>
-              Дата та час
-            </h3>
-            <div className="label mb-2">Дата поїздки</div>
-            <DatePicker value={date} onChange={d => { setDate(d); setErrors(e => ({ ...e, date: '' })); setSelectedTime(''); }} />
-            {errors.date && <p className="text-red-400 text-xs mt-1">{errors.date}</p>}
-
-            <div className="mt-4">
-              <div className="label mb-2">Час відправлення</div>
-              <div className="space-y-4">
-                <div>
-                  <div className="text-brand-muted text-[10px] uppercase font-bold tracking-wider mb-2 flex items-center gap-1.5 opacity-60">
-                    <Clock size={10} /> Вранці
+        {submitStatus === 'success' ? (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="card p-12 text-center space-y-6 border-green-500/30"
+          >
+             <div className="w-20 h-20 bg-green-500/10 rounded-full flex items-center justify-center mx-auto text-green-500">
+                <CheckCircle2 size={48} />
+             </div>
+             <h2 className="text-3xl font-display font-black text-white">Успішно заброньовано!</h2>
+             <p className="text-brand-muted max-w-sm mx-auto">{statusMessage}</p>
+             <button 
+               onClick={() => setSubmitStatus('idle')}
+               className="btn-primary px-8 py-3 mx-auto flex items-center justify-center gap-2"
+             >
+                Повернутись назад
+             </button>
+          </motion.div>
+        ) : (
+          <form onSubmit={handleSubmit} className="card p-6 md:p-8 space-y-4 relative overflow-hidden">
+            {isSubmitting && (
+              <div className="absolute inset-0 z-50 bg-brand-dark/60 backdrop-blur-sm flex flex-col items-center justify-center space-y-4">
+                  <div className="relative">
+                    <Loader2 size={48} className="text-brand-yellow animate-spin" />
+                    <SprinterTaxiIcon className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-brand-yellow scale-50" />
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    {MORNING_TIMES.map(time => {
-                      const disabled = isTimeDisabled(time);
-                      return (
-                        <button
-                          key={time}
-                          type="button"
-                          disabled={disabled}
-                          onClick={() => { setSelectedTime(time); setErrors(e => ({ ...e, time: '' })); }}
-                          className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 ${
-                            selectedTime === time
-                              ? 'bg-brand-yellow text-brand-dark shadow-brand'
-                              : disabled 
-                                ? 'bg-brand-dark border border-brand-border text-brand-muted opacity-40 cursor-not-allowed'
-                                : 'bg-brand-surface border border-brand-border text-brand-light hover:border-brand-yellow/50 hover:text-brand-yellow'
-                          }`}
-                        >
-                          {time}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-brand-muted text-[10px] uppercase font-bold tracking-wider mb-2 flex items-center gap-1.5 opacity-60">
-                    <Clock size={10} /> Вдень / Вечір
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {AFTERNOON_TIMES.map(time => {
-                      const disabled = isTimeDisabled(time);
-                      return (
-                        <button
-                          key={time}
-                          type="button"
-                          disabled={disabled}
-                          onClick={() => { setSelectedTime(time); setErrors(e => ({ ...e, time: '' })); }}
-                          className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 ${
-                            selectedTime === time
-                              ? 'bg-brand-yellow text-brand-dark shadow-brand'
-                              : disabled 
-                                ? 'bg-brand-dark border border-brand-border text-brand-muted opacity-40 cursor-not-allowed'
-                                : 'bg-brand-surface border border-brand-border text-brand-light hover:border-brand-yellow/50 hover:text-brand-yellow'
-                          }`}
-                        >
-                          {time}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+                  <p className="text-brand-yellow font-bold animate-pulse text-center px-4">Записуємо ваше місце в таблицю...</p>
               </div>
-              {errors.time && <p className="text-red-400 text-xs mt-1">{errors.time}</p>}
-            </div>
-          </div>
+            )}
 
-          <div>
-            <div className="label mb-2">Кількість місць</div>
-            <div className="flex items-center gap-4">
-              {[1, 2, 3, 4].map(n => (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => setSeats(n)}
-                  className={`w-12 h-12 rounded-xl text-sm font-bold transition-all duration-150 ${
-                    seats === n
-                      ? 'bg-brand-yellow text-brand-dark shadow-brand'
-                      : 'bg-brand-surface border border-brand-border text-brand-light hover:border-brand-yellow/50 hover:text-brand-yellow'
-                  }`}
+            {/* STEP 1: DIRECTION */}
+            <div>
+              <h3 className="section-title text-2xl mb-6 flex items-center gap-3">
+                <span className="w-8 h-8 rounded-full bg-brand-yellow text-brand-dark flex items-center justify-center text-sm font-black">1</span>
+                Оберіть напрямок
+              </h3>
+              <div className="grid sm:grid-cols-2 gap-4">
+                {[
+                  { id: 0, label: 'Львів → Східниця', desc: 'Через Стебник, Трускавець, Борислав' },
+                  { id: 1, label: 'Східниця → Львів', desc: 'Через Борислав, Трускавець, Стебник' }
+                ].map((dir) => (
+                  <button
+                    key={dir.id}
+                    type="button"
+                    onClick={() => { setDirectionIndex(dir.id); setFrom(''); setTo(''); setErrors({}); }}
+                    className={`p-6 rounded-2xl border-2 transition-all text-left group
+                      ${directionIndex === dir.id ? 'border-brand-yellow bg-brand-yellow/5' : 'border-brand-border hover:border-brand-yellow/40'}
+                    `}
+                  >
+                    <div className="flex justify-between items-center mb-2">
+                        <span className={`font-display font-black text-xl ${directionIndex === dir.id ? 'text-brand-yellow' : 'text-white'}`}>{dir.label}</span>
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${directionIndex === dir.id ? 'border-brand-yellow' : 'border-brand-border'}`}>
+                          {directionIndex === dir.id && <div className="w-2.5 h-2.5 rounded-full bg-brand-yellow" />}
+                        </div>
+                    </div>
+                    <p className="text-sm text-brand-muted">{dir.desc}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* STEP 2: STOPS */}
+            <AnimatePresence>
+              {directionIndex !== null && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="overflow-hidden"
                 >
-                  {n}
-                </button>
-              ))}
-            </div>
-          </div>
+                  <h3 className="section-title text-2xl mb-8 flex items-center gap-3 pt-4 border-t border-brand-border">
+                    <span className="w-8 h-8 rounded-full bg-brand-yellow text-brand-dark flex items-center justify-center text-sm font-black">2</span>
+                    Оберіть маршрут (два кліки)
+                  </h3>
+                  
+                  <div className="relative">
+                    <div className="absolute left-4 right-4 h-1 bg-brand-border top-5 -z-10" />
+                    
+                    <div className="flex justify-between items-start">
+                      {currentRoute.map((stop, idx) => {
+                        const isFrom = from === stop.id;
+                        const isTo = to === stop.id;
+                        const isIntermediate = from && to && 
+                            currentRoute.findIndex(s => s.id === from) < idx && 
+                            currentRoute.findIndex(s => s.id === to) > idx;
 
-          {/* Passenger info */}
-          <div>
-            <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
-              <div className="w-6 h-6 rounded-full bg-brand-yellow/20 flex items-center justify-center text-brand-yellow text-xs font-bold">3</div>
-              Дані пасажира
-            </h3>
-            <div className="space-y-4">
-              <div>
-                <div className="label mb-2">Повне ім'я</div>
-                <div className="relative">
-                  <User size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-yellow" />
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={e => { setName(e.target.value); setErrors(err => ({ ...err, name: '' })); }}
-                    placeholder="Наприклад: Іваненко Іван"
-                    className="input-field pl-11"
-                  />
-                </div>
-                {errors.name && <p className="text-red-400 text-xs mt-1">{errors.name}</p>}
-              </div>
-              <div>
-                <div className="label mb-2">Номер телефону</div>
-                <div className="relative">
-                  <Phone size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-yellow" />
-                  <input
-                    type="tel"
-                    value={phone}
-                    onChange={e => {
-                      setPhone(formatPhone(e.target.value));
-                      setErrors(err => ({ ...err, phone: '' }));
-                    }}
-                    placeholder="+380 XX XXX XX XX"
-                    className="input-field pl-11"
-                  />
-                </div>
-                {errors.phone && <p className="text-red-400 text-xs mt-1">{errors.phone}</p>}
-              </div>
-            </div>
-          </div>
+                        return (
+                          <div key={stop.id} className="flex flex-col items-center group w-full">
+                            <button
+                              type="button"
+                              onClick={() => { handleStopSelect(stop.id); setErrors({}); }}
+                              className={`relative w-10 h-10 rounded-full border-4 flex items-center justify-center transition-all duration-300
+                                  ${isFrom || isTo ? 'bg-brand-yellow border-brand-yellow scale-125 shadow-brand' : 'bg-brand-dark border-brand-border group-hover:border-brand-yellow/50'}
+                                  ${isIntermediate ? 'border-brand-yellow/60' : ''}
+                              `}
+                            >
+                              {isFrom && <span className="text-brand-dark text-[10px] font-black italic">ЗВІДКИ</span>}
+                              {isTo && <span className="text-brand-dark text-[10px] font-black italic">КУДИ</span>}
+                              {!isFrom && !isTo && <div className={`w-2 h-2 rounded-full ${isIntermediate ? 'bg-brand-yellow' : 'bg-brand-border'}`} />}
+                            </button>
+                            <span className={`mt-4 text-[11px] font-bold text-center max-w-[80px] transition-colors ${isFrom || isTo ? 'text-brand-yellow' : 'text-brand-muted hover:text-white'}`}>
+                              {stop.name}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
 
-          {/* Total */}
-          {price > 0 && (
-            <div className="bg-brand-surface rounded-xl p-4 space-y-2">
-              <div className="flex justify-between text-sm text-brand-light">
-                <span>Ціна за місце</span>
-                <span>{price} грн</span>
-              </div>
-              {seats > 1 && (
-                <div className="flex justify-between text-sm text-brand-light">
-                  <span>Кількість місць</span>
-                  <span>×{seats}</span>
-                </div>
+                    {!from && <div className="mt-4 text-center text-sm text-brand-yellow animate-pulse uppercase font-black tracking-widest bg-brand-yellow/5 py-3 rounded-lg border border-brand-yellow/10">Оберіть точку відправлення</div>}
+                    {from && !to && <div className="mt-4 text-center text-sm text-brand-yellow animate-pulse uppercase font-black tracking-widest bg-brand-yellow/5 py-3 rounded-lg border border-brand-yellow/10">Тепер оберіть точку прибуття</div>}
+                    {from && to && (
+                        <div className="mt-2 bg-brand-yellow/5 p-3 rounded-xl border border-brand-yellow/10 flex items-center justify-center gap-4">
+                          <div className="flex items-center gap-3">
+                            <span className="text-white font-bold">{currentRoute.find(s=>s.id===from)?.name}</span>
+                            <ArrowRight size={16} className="text-brand-yellow" />
+                            <span className="text-white font-bold">{currentRoute.find(s=>s.id===to)?.name}</span>
+                          </div>
+                          <button type="button" onClick={()=>{setFrom('');setTo('');setSelectedTime('');setErrors({});}} className="text-[10px] text-brand-muted hover:text-white underline">Зкинути</button>
+                        </div>
+                    )}
+
+                    {(isForbidden || errors.route) && (
+                      <div className="mt-4 bg-red-500/10 border border-red-500/20 p-4 rounded-xl text-red-500 text-sm flex items-center gap-3 justify-center">
+                        <AlertCircle size={18} />
+                        <span>{errors.route || "Даний маршрут недоступний для бронювання."}</span>
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
               )}
-              <div className="flex justify-between items-center text-white font-bold text-lg border-t border-brand-border pt-2">
-                <span>Разом</span>
-                <span className="text-brand-yellow text-2xl">{price * seats} грн</span>
-              </div>
-            </div>
-          )}
+            </AnimatePresence>
 
-          <button type="submit" className="btn-primary w-full text-base py-4 flex items-center justify-center gap-2">
-            Перейти до оплати
-            <ArrowRight size={18} />
-          </button>
-        </form>
+            {/* STEP 3: DATE & AVAILABILITY */}
+            {from && to && !isForbidden && (
+              <div className="space-y-4 pt-2 border-t border-brand-border">
+                <div className="grid md:grid-cols-2 gap-8">
+                    <div>
+                      <h3 className="section-title text-xl mb-4 flex items-center gap-3">
+                        <span className="w-6 h-6 rounded-full bg-brand-yellow text-brand-dark flex items-center justify-center text-[10px] font-black">3</span>
+                        Дата
+                      </h3>
+                      <DatePicker value={date} onChange={d => { setDate(d); setErrors(e => ({ ...e, date: '' })); setSelectedTime(''); }} />
+                      {errors.date && <p className="text-red-400 text-xs mt-1">{errors.date}</p>}
+                    </div>
+                </div>
+
+                <div>
+                  <h3 className="label mb-4 flex items-center justify-between">
+                    <span>Доступність екіпажів</span>
+                    {date && <span className="text-[10px] text-green-500 uppercase tracking-widest animate-pulse">Live Оновлення</span>}
+                  </h3>
+                  {!date ? (
+                    <div className="card-inner p-10 border border-dashed border-brand-border rounded-2xl text-center text-brand-muted">Оберіть дату поїздки</div>
+                  ) : isLoadingAvailability ? (
+                    <div className="flex flex-col items-center justify-center p-12 space-y-4">
+                       <Loader2 size={32} className="text-brand-yellow animate-spin" />
+                       <span className="text-brand-muted text-sm">Оновлюємо наявні місця...</span>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {MORNING_TIMES.concat(AFTERNOON_TIMES).map(time => <AvailabilityCard key={time} time={time} />)}
+                    </div>
+                  )}
+                  {errors.time && <p className="text-red-400 text-xs mt-2">{errors.time}</p>}
+                </div>
+
+                {/* PASSENGER INFO + SEATS */}
+                <div className="pt-8 border-t border-brand-border">
+                    <h3 className="section-title text-xl mb-6">Дані пасажира та Місця</h3>
+                    <div className="grid lg:grid-cols-3 gap-6">
+                        <div className="lg:col-span-1">
+                            <div className="label mb-2">Ваше ім'я</div>
+                            <div className="relative">
+                              <User size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-yellow" />
+                              <input type="text" value={name} onChange={e => { setName(e.target.value); setErrors(err => ({ ...err, name: '' })); }} placeholder="Іван Іваненко" className="input-field pl-12 h-14" />
+                            </div>
+                            {errors.name && <p className="text-red-400 text-xs mt-1">{errors.name}</p>}
+                        </div>
+                        <div className="lg:col-span-1">
+                            <div className="label mb-2">Телефон</div>
+                            <div className="relative">
+                              <Phone size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-yellow" />
+                              <input type="tel" value={phone} onChange={e => { setPhone(formatPhone(e.target.value)); setErrors(err => ({ ...err, phone: '' })); }} placeholder="+380" className="input-field pl-12 h-14" />
+                            </div>
+                            {errors.phone && <p className="text-red-400 text-xs mt-1">{errors.phone}</p>}
+                        </div>
+                        <div className="lg:col-span-1">
+                            <div className="label mb-2">Кількість місць</div>
+                            <div className="flex gap-2">
+                              {[1, 2, 3, 4].map(n => (
+                                <button
+                                  key={n}
+                                  type="button"
+                                  onClick={() => setSeats(n)}
+                                  className={`flex-1 h-14 rounded-xl text-sm font-bold transition-all ${seats === n ? 'bg-brand-yellow text-brand-dark shadow-brand' : 'bg-brand-surface border border-brand-border text-brand-muted hover:border-brand-yellow/50'}`}
+                                >
+                                  {n}
+                                </button>
+                              ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {submitStatus === 'error' && (
+                  <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-xl text-red-500 text-sm text-center">
+                     {statusMessage}
+                  </div>
+                )}
+
+                {price > 0 && selectedTime && (
+                  <div className="bg-brand-dark/40 rounded-2xl p-6 border border-brand-yellow/20 flex flex-col md:flex-row justify-between items-center gap-6">
+                    <div>
+                      <div className="text-brand-muted text-xs uppercase tracking-widest font-black mb-1">Разом за {seats} пас.</div>
+                      <div className="text-brand-yellow text-4xl font-display font-black leading-none">{price * seats} грн</div>
+                    </div>
+                    <button type="submit" disabled={isSubmitting} className="btn-primary w-full md:w-auto px-12 py-5 text-lg flex items-center justify-center gap-3 group disabled:opacity-50 text-dark font-black">
+                      {isSubmitting ? 'Записуємо...' : 'Забронювати'}
+                      {!isSubmitting && <ChevronRight size={20} className="group-hover:translate-x-1 transition-transform" />}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </form>
+        )}
       </motion.div>
     </section>
   );
