@@ -35,7 +35,7 @@ export default function PaymentModal({ data, onClose }: PaymentModalProps) {
 
     try {
       const payload = {
-        from: STOPS.find(s=>s.id===data.from)?.name || data.from,
+        from: (STOPS.find(s=>s.id===data.from)?.name || data.from) + (data.pickupLocation ? ` (${data.pickupLocation})` : ''),
         to: STOPS.find(s=>s.id===data.to)?.name || data.to,
         date: data.date.toLocaleDateString('uk-UA'),
         name: data.name,

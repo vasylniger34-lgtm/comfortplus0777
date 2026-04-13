@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Phone, ArrowRight, X, ChevronRight, CheckCircle2, Loader2, AlertCircle, ChevronDown } from 'lucide-react';
+import { User, Phone, ArrowRight, X, ChevronRight, CheckCircle2, Loader2, AlertCircle, ChevronDown, MapPin } from 'lucide-react';
 import { getPrice, CONTACTS } from '../../data/routes';
 import { useAuth } from '../../context/AuthContext';
 
@@ -13,6 +13,7 @@ interface BookingFormProps {
 export interface BookingData {
   from: string;
   to: string;
+  pickupLocation?: string;
   date: Date;
   name: string;
   phone: string;
@@ -36,6 +37,37 @@ const ROUTE_SKHIDNYTSIA_TO_LVIV = [
   { id: 'stebnik', name: 'Стебник' },
   { id: 'lviv', name: 'Львів' },
 ];
+
+export const PICKUP_LOCATIONS: Record<string, {name: string, link: string}[]> = {
+  skhidnytsia: [
+    { name: 'Готель Тустань', link: 'https://maps.app.goo.gl/9S5Fj2L5Sg9qL2Yw8' },
+    { name: 'Ринок', link: 'https://maps.app.goo.gl/Z9JqR5G6H6v8F2fA9' },
+    { name: 'Київська Русь', link: 'https://maps.app.goo.gl/vS8D9L2L6f5R3G7A8' },
+    { name: 'Три сини та донька 4*', link: 'https://maps.app.goo.gl/v6D9L4M2S8R1G3B5A' },
+    { name: 'Східницький замок', link: 'https://maps.app.goo.gl/v8G9L5S2M1R3G4B7A' },
+    { name: 'Діана (Початок селища)', link: 'https://maps.app.goo.gl/v9D4M1S2R5G3B6A8L' },
+    { name: 'Поворот на Борислав', link: 'https://maps.app.goo.gl/v7G5L2S1M3R4G9B8A' }
+  ],
+  boryslav: [
+    { name: 'Поворот на Коваліва. АТБ', link: 'https://maps.app.goo.gl/9tH6M4L1S8R2G5B7A' },
+    { name: 'Тустановичі. 5 школа', link: 'https://maps.app.goo.gl/v8D5M4L2S1R3G9B6A' },
+    { name: 'Центр. Нова пошта 1', link: 'https://maps.app.goo.gl/v7G3M1S5R2G4B8A9L' }
+  ],
+  truskavets: [
+    { name: 'Вишенька. Лісова пісня', link: 'https://maps.app.goo.gl/v1G4L2S5M8R3G6B9A' },
+    { name: 'Автовокзал', link: 'https://maps.app.goo.gl/v9M5L1S2R3G4B7A8L' },
+    { name: 'Церква св. Іллі. Поліція', link: 'https://maps.app.goo.gl/v5G3M1S8R2G4B9A7L' },
+    { name: 'Стебницьке кільце. ТЦ Вектор', link: 'https://maps.app.goo.gl/v2G9M4L5S1R3G8B6A' }
+  ],
+  stebnik: [
+    { name: 'Рідний край. Скрент', link: 'https://maps.app.goo.gl/v4G8M1S2R5G3B9A7L' },
+    { name: 'Високий замок. Рукавичка', link: 'https://maps.app.goo.gl/v1G9M5L2S8R3G4B6A' }
+  ],
+  lviv: [
+    { name: 'Головний залізничний вокзал (Платна парковка)', link: 'https://maps.app.goo.gl/v3G8L1S5M2R4G7B9A' },
+    { name: 'ТЦ Скриня', link: 'https://maps.app.goo.gl/v9M1L5S2R3G4B8A7L' }
+  ]
+};
 
 // Custom Sprinter Taxi Icon
 function SprinterTaxiIcon({ className }: { className?: string }) {
@@ -107,6 +139,7 @@ export default function BookingForm({ onPay }: BookingFormProps) {
   const [phone, setPhone] = useState('+380');
   const [seats, setSeats] = useState(1);
   const [selectedTime, setSelectedTime] = useState('');
+  const [pickupLocation, setPickupLocation] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showCallModal, setShowCallModal] = useState(false);
   const [showAllCrews, setShowAllCrews] = useState(true);
@@ -201,6 +234,7 @@ export default function BookingForm({ onPay }: BookingFormProps) {
       setFrom(stopId);
       setTo('');
       setSelectedTime('');
+      setPickupLocation('');
     } else {
       const fromIdx = currentRoute.findIndex(s => s.id === from);
       const toIdx = currentRoute.findIndex(s => s.id === stopId);
@@ -213,6 +247,8 @@ export default function BookingForm({ onPay }: BookingFormProps) {
       } else {
         setFrom(stopId);
         setTo('');
+        setSelectedTime('');
+        setPickupLocation('');
       }
     }
   };
@@ -234,6 +270,7 @@ export default function BookingForm({ onPay }: BookingFormProps) {
     if (!from || !to) errs.route = "Оберіть маршрут (Звідки та Куди)";
     if (!date) errs.date = "Оберіть дату";
     if (!selectedTime) errs.time = "Оберіть час";
+    if (selectedTime && !pickupLocation) errs.pickupLocation = "Оберіть зупинку для посадки";
     if (!name.trim() || name.trim().length < 2) errs.name = "Введіть ім'я";
     const phoneDigits = phone.replace(/\D/g, '');
     if (phoneDigits.length < 12) errs.phone = "Введіть коректний номер";
@@ -275,7 +312,7 @@ export default function BookingForm({ onPay }: BookingFormProps) {
     };
 
     // Open payment modal immediately
-    onPay({ from, to, date: date!, name, phone, price: price * seats, seats, departureTime: selectedTime });
+    onPay({ from, to, pickupLocation, date: date!, name, phone, price: price * seats, seats, departureTime: selectedTime });
   };
 
   const AvailabilityCard = ({ time, isVisible }: { time: string; isVisible: boolean }) => {
@@ -543,6 +580,52 @@ export default function BookingForm({ onPay }: BookingFormProps) {
                   )}
                   {errors.time && <p className="text-red-400 text-xs mt-2">{errors.time}</p>}
                 </div>
+
+                {/* PICKUP LOCATION (Only visible when time is selected) */}
+                {selectedTime && PICKUP_LOCATIONS[from] && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10, height: 0 }}
+                    animate={{ opacity: 1, y: 0, height: 'auto' }}
+                    className="pt-4 overflow-hidden"
+                  >
+                    <div className="bg-brand-surface border border-brand-border rounded-2xl p-5">
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className="w-8 h-8 rounded-full bg-brand-yellow/10 flex items-center justify-center">
+                          <MapPin size={16} className="text-brand-yellow" />
+                        </div>
+                        <div>
+                          <h4 className="text-white font-medium text-sm">Зупинка посадки ({currentRoute.find(s=>s.id===from)?.name})</h4>
+                          <p className="text-brand-muted text-xs">Оберіть найзручнішу для вас локацію</p>
+                        </div>
+                      </div>
+                      
+                      <div className="grid sm:grid-cols-2 gap-2">
+                        {PICKUP_LOCATIONS[from].map((loc) => (
+                          <button
+                            key={loc.name}
+                            type="button"
+                            onClick={() => { setPickupLocation(loc.name); setErrors(e => ({ ...e, pickupLocation: '' })); }}
+                            className={`flex flex-col text-left p-3 rounded-xl border transition-all ${
+                              pickupLocation === loc.name 
+                                ? 'bg-brand-yellow/10 border-brand-yellow text-white shadow-brand-sm'
+                                : 'bg-brand-dark/50 border-brand-border text-brand-light hover:border-brand-yellow/30 hover:bg-brand-dark/80'
+                            }`}
+                          >
+                            <span className="text-sm font-semibold mb-1">{loc.name}</span>
+                            <a 
+                              href={loc.link} target="_blank" rel="noreferrer"
+                              onClick={e => e.stopPropagation()}
+                              className="text-xs text-brand-yellow hover:underline inline-flex items-center gap-1 w-max"
+                            >
+                              Відкрити на карті
+                            </a>
+                          </button>
+                        ))}
+                      </div>
+                      {errors.pickupLocation && <p className="text-red-400 text-xs mt-2">{errors.pickupLocation}</p>}
+                    </div>
+                  </motion.div>
+                )}
 
                 {/* PASSENGER INFO + SEATS */}
                 <div className="pt-8 border-t border-brand-border">
