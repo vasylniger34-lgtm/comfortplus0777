@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Phone, ArrowRight, X, ChevronRight, CheckCircle2, Loader2, AlertCircle, ChevronDown, MapPin } from 'lucide-react';
+import { User, Phone, ArrowRight, X, ChevronRight, CheckCircle2, Loader2, AlertCircle, ChevronDown, MapPin, Map } from 'lucide-react';
 import { getPrice, CONTACTS } from '../../data/routes';
 import { useAuth } from '../../context/AuthContext';
 
@@ -140,6 +140,7 @@ export default function BookingForm({ onPay }: BookingFormProps) {
   const [seats, setSeats] = useState(1);
   const [selectedTime, setSelectedTime] = useState('');
   const [pickupLocation, setPickupLocation] = useState('');
+  const [isPickupDropdownOpen, setIsPickupDropdownOpen] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showCallModal, setShowCallModal] = useState(false);
   const [showAllCrews, setShowAllCrews] = useState(true);
@@ -586,9 +587,9 @@ export default function BookingForm({ onPay }: BookingFormProps) {
                   <motion.div
                     initial={{ opacity: 0, y: 10, height: 0 }}
                     animate={{ opacity: 1, y: 0, height: 'auto' }}
-                    className="pt-4 overflow-hidden"
+                    className="pt-4 overflow-visible"
                   >
-                    <div className="bg-brand-surface border border-brand-border rounded-2xl p-5">
+                    <div className="bg-brand-surface/40 border border-brand-border rounded-2xl p-5">
                       <div className="flex items-center gap-3 mb-4">
                         <div className="w-8 h-8 rounded-full bg-brand-yellow/10 flex items-center justify-center">
                           <MapPin size={16} className="text-brand-yellow" />
@@ -599,30 +600,70 @@ export default function BookingForm({ onPay }: BookingFormProps) {
                         </div>
                       </div>
                       
-                      <div className="grid sm:grid-cols-2 gap-2">
-                        {PICKUP_LOCATIONS[from].map((loc) => (
-                          <button
-                            key={loc.name}
-                            type="button"
-                            onClick={() => { setPickupLocation(loc.name); setErrors(e => ({ ...e, pickupLocation: '' })); }}
-                            className={`flex flex-col text-left p-3 rounded-xl border transition-all ${
-                              pickupLocation === loc.name 
-                                ? 'bg-brand-yellow/10 border-brand-yellow text-white shadow-brand-sm'
-                                : 'bg-brand-dark/50 border-brand-border text-brand-light hover:border-brand-yellow/30 hover:bg-brand-dark/80'
-                            }`}
-                          >
-                            <span className="text-sm font-semibold mb-1">{loc.name}</span>
-                            <a 
-                              href={loc.link} target="_blank" rel="noreferrer"
-                              onClick={e => e.stopPropagation()}
-                              className="text-xs text-brand-yellow hover:underline inline-flex items-center gap-1 w-max"
+                      <div className="relative">
+                        <button 
+                          type="button" 
+                          onClick={() => setIsPickupDropdownOpen(!isPickupDropdownOpen)}
+                          className={`w-full text-left bg-brand-dark/80 border ${errors.pickupLocation ? 'border-red-500' : 'border-brand-border'} rounded-xl p-4 flex items-center justify-between hover:border-brand-yellow/50 transition-all`}
+                        >
+                          <div className="flex flex-col">
+                            <span className="text-brand-muted text-[10px] uppercase font-bold tracking-wider mb-1">Ваша зупинка</span>
+                            <span className={`text-sm font-medium ${pickupLocation ? 'text-white' : 'text-brand-muted'}`}>
+                              {pickupLocation || "Натисніть, щоб обрати..."}
+                            </span>
+                          </div>
+                          <ChevronDown size={18} className={`text-brand-yellow transition-transform ${isPickupDropdownOpen ? 'rotate-180' : ''}`} />
+                        </button>
+
+                        <AnimatePresence>
+                          {isPickupDropdownOpen && (
+                            <motion.div
+                              initial={{ opacity: 0, y: -10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: -10 }}
+                              className="absolute top-full left-0 right-0 z-20 mt-2 bg-[#2A2A2A] border border-brand-border rounded-xl shadow-xl overflow-hidden"
                             >
-                              Відкрити на карті
-                            </a>
-                          </button>
-                        ))}
+                              <div className="max-h-60 overflow-y-auto w-full py-2 custom-scrollbar">
+                                {PICKUP_LOCATIONS[from].map(loc => (
+                                  <button
+                                     key={loc.name}
+                                     type="button"
+                                     onClick={() => { setPickupLocation(loc.name); setIsPickupDropdownOpen(false); setErrors(e => ({ ...e, pickupLocation: '' })); }}
+                                     className={`w-full text-left px-5 py-3 text-sm flex items-center justify-between transition-colors ${pickupLocation === loc.name ? 'text-brand-yellow bg-brand-yellow/10' : 'text-white hover:bg-brand-surface'}`}
+                                  >
+                                     {loc.name}
+                                     {pickupLocation === loc.name && <CheckCircle2 size={16} />}
+                                  </button>
+                                ))}
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </div>
+
                       {errors.pickupLocation && <p className="text-red-400 text-xs mt-2">{errors.pickupLocation}</p>}
+
+                      {/* Map Button (visible if something is selected) */}
+                      <AnimatePresence>
+                        {pickupLocation && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                            animate={{ opacity: 1, height: 'auto', marginTop: 12 }}
+                            exit={{ opacity: 0, height: 0, marginTop: 0 }}
+                          >
+                            <a 
+                              href={PICKUP_LOCATIONS[from].find(l => l.name === pickupLocation)?.link} 
+                              target="_blank" rel="noreferrer"
+                              className="inline-flex items-center gap-2 px-4 py-2 bg-brand-surface border border-brand-border hover:border-brand-yellow/50 rounded-lg text-xs font-medium text-brand-light hover:text-white transition-all group w-max"
+                            >
+                              <div className="w-6 h-6 rounded-md bg-blue-500/10 flex items-center justify-center group-hover:scale-105 transition-transform">
+                                <Map size={14} className="text-blue-400" />
+                              </div>
+                              Відкрити на Google Картах
+                            </a>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
                   </motion.div>
                 )}
