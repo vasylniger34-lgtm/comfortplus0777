@@ -97,7 +97,7 @@ export default function BookingFormMockup({ onPay }: BookingFormProps) {
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [statusMessage, setStatusMessage] = useState('');
 
-  const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzUs4oJhJm3Z1krIyA1Z7IYv3_B3tOhBYF_VjDBEC_dBolbM0sLjEaKbiwwJQKtgRBi/exec';
+  const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxd8ZIMLZdgaOKw7YBmbTK72mCUvy8rmRcOUvqQ2W3vZifJy3wTVbh_q-ikWL1FarXk/exec';
 
   const price = getPrice(from, to);
   const currentRoute = directionIndex === 0 ? ROUTE_LVIV_TO_SKHIDNYTSIA : ROUTE_SKHIDNYTSIA_TO_LVIV;
@@ -120,7 +120,7 @@ export default function BookingFormMockup({ onPay }: BookingFormProps) {
     return departureDate < now;
   };
 
-  const MORNING_TIMES = ['05:50', '06:20', '07:10', '08:15', '08:50', '09:30', '10:35'];
+  const MORNING_TIMES = ['05:50', '06:20', '07:10', '08:10', '08:50', '09:30', '10:35'];
   const AFTERNOON_TIMES = ['11:10', '12:00', '12:40', '13:20', '14:10', '15:30', '16:20', '17:00', '17:40'];
 
   const handleStopSelect = (stopId: string) => {

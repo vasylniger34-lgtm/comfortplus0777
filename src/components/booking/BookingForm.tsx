@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Phone, ArrowRight, X, ChevronRight, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
+import { User, Phone, ArrowRight, X, ChevronRight, CheckCircle2, Loader2, AlertCircle, ChevronDown } from 'lucide-react';
 import { getPrice, CONTACTS } from '../../data/routes';
 import { useAuth } from '../../context/AuthContext';
 
@@ -109,6 +109,7 @@ export default function BookingForm({ onPay }: BookingFormProps) {
   const [selectedTime, setSelectedTime] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showCallModal, setShowCallModal] = useState(false);
+  const [showAllCrews, setShowAllCrews] = useState(true);
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
@@ -161,7 +162,7 @@ export default function BookingForm({ onPay }: BookingFormProps) {
     return departureDate < now;
   };
 
-  const MORNING_TIMES = ['05:50', '06:20', '07:10', '08:15', '08:50', '09:30', '10:35'];
+  const MORNING_TIMES = ['05:50', '06:20', '07:10', '08:10', '08:50', '09:30', '10:35'];
   const AFTERNOON_TIMES = ['11:10', '12:00', '12:40', '13:20', '14:10', '15:30', '16:20', '17:00', '17:40'];
 
   const handleStopSelect = (stopId: string) => {
@@ -259,10 +260,12 @@ export default function BookingForm({ onPay }: BookingFormProps) {
 
       if (result.result === 'error') {
         const errorMsg = result.message || 'Помилка запису';
-        if (errorMsg === 'нема місць') {
+        if (errorMsg === 'нема місць' || errorMsg === 'No seats' || errorMsg.includes('Недостатньо')) {
           throw new Error('У вибраному екіпажі більше немає вільних місць.');
-        } else if (errorMsg === 'конфлікт запису') {
+        } else if (errorMsg === 'конфлікт запису' || errorMsg === 'Conflict') {
           throw new Error('Це місце щойно було заброньоване іншим користувачем. Спробуйте ще раз.');
+        } else if (errorMsg.includes('Unknown time')) {
+          throw new Error('Обраний час не знайдено в системі. Оберіть інший час.');
         } else {
           throw new Error(errorMsg);
         }
@@ -275,27 +278,42 @@ export default function BookingForm({ onPay }: BookingFormProps) {
         onPay({ from, to, date: date!, name, phone, price: price * seats, seats, departureTime: selectedTime });
       }, 2500);
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Sheets Error:', error);
       setSubmitStatus('error');
-      setStatusMessage('Сталася помилка при з\'єднанні з таблицею. Спробуйте ще раз.');
+      setStatusMessage(error?.message || 'Сталася помилка при з\'єднанні з таблицею. Спробуйте ще раз.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const AvailabilityCard = ({ time }: { time: string }) => {
+  const AvailabilityCard = ({ time, isVisible }: { time: string; isVisible: boolean }) => {
     const passed = isTimePassed(time);
     if (passed) return null;
     
     const isSelected = selectedTime === time;
     const timeData = availability[time] || [];
-    const freeSeats = timeData.length > 0 ? timeData.filter(s => !s.name).length : 8;
+    const freeSeats = timeData.length > 0 ? timeData.filter(s => !s.name).length : 12;
+    
+    // Hide crew if no free seats
+    if (freeSeats === 0) return null;
+    
+    // If a crew is selected — only show the selected one unless expanded
+    if (!isVisible && !isSelected) return null;
 
     return (
-      <button
+      <motion.button
         type="button"
-        onClick={() => { setSelectedTime(time); setErrors(e => ({ ...e, time: '' })); }}
+        layout
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -10, height: 0, marginBottom: 0 }}
+        transition={{ duration: 0.3 }}
+        onClick={() => { 
+          setSelectedTime(isSelected ? '' : time); 
+          setShowAllCrews(isSelected); 
+          setErrors(e => ({ ...e, time: '' })); 
+        }}
         className={`relative flex items-center justify-between p-5 rounded-2xl border transition-all duration-200 text-left w-full
           ${isSelected 
             ? 'bg-brand-yellow text-brand-dark border-brand-yellow shadow-brand scale-[1.01]' 
@@ -321,10 +339,12 @@ export default function BookingForm({ onPay }: BookingFormProps) {
         </div>
         <div className="flex items-center gap-4">
             <div className="text-right hidden sm:block">
-                <div className={`text-[10px] uppercase font-black tracking-tighter ${isSelected ? 'text-brand-dark/60' : 'text-green-500'}`}>Статус: Вільний</div>
+                <div className={`text-[10px] uppercase font-black tracking-tighter ${isSelected ? 'text-brand-dark/60' : freeSeats <= 3 ? 'text-orange-400' : 'text-green-500'}`}>
+                  {isSelected ? 'Обрано' : freeSeats <= 3 ? 'Мало місць' : 'Статус: Вільний'}
+                </div>
                 <div className={`text-xs font-bold ${isSelected ? 'text-brand-dark' : 'text-white'}`}>Готовий до виїзду</div>
             </div>
-            <div className={`w-3 h-3 rounded-full pulse ${isSelected ? 'bg-brand-dark' : 'bg-green-500'}`} />
+            <div className={`w-3 h-3 rounded-full pulse ${isSelected ? 'bg-brand-dark' : freeSeats <= 3 ? 'bg-orange-400' : 'bg-green-500'}`} />
         </div>
         {isSelected && (
           <div className="absolute -top-2 -right-2 transform transition-transform">
@@ -333,7 +353,7 @@ export default function BookingForm({ onPay }: BookingFormProps) {
              </div>
           </div>
         )}
-      </button>
+      </motion.button>
     );
   };
 
@@ -510,7 +530,24 @@ export default function BookingForm({ onPay }: BookingFormProps) {
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {MORNING_TIMES.concat(AFTERNOON_TIMES).map(time => <AvailabilityCard key={time} time={time} />)}
+                      <AnimatePresence mode="popLayout">
+                        {MORNING_TIMES.concat(AFTERNOON_TIMES).map(time => (
+                          <AvailabilityCard key={time} time={time} isVisible={showAllCrews} />
+                        ))}
+                      </AnimatePresence>
+                      {selectedTime && !showAllCrews && (
+                        <motion.button
+                          type="button"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          transition={{ delay: 0.3 }}
+                          onClick={() => setShowAllCrews(true)}
+                          className="w-full py-3 text-sm text-brand-muted hover:text-brand-yellow flex items-center justify-center gap-2 rounded-xl border border-dashed border-brand-border hover:border-brand-yellow/30 transition-all"
+                        >
+                          <ChevronDown size={16} />
+                          Показати інші екіпажі
+                        </motion.button>
+                      )}
                     </div>
                   )}
                   {errors.time && <p className="text-red-400 text-xs mt-2">{errors.time}</p>}

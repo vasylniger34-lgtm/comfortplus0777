@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Shield, Clock, Star, Wifi } from 'lucide-react';
+import { AnimatePresence } from 'framer-motion';
 
 import Header from './components/layout/Header';
 import Footer from './components/layout/Footer';
@@ -17,54 +16,6 @@ import type { BookingData } from './components/booking/BookingForm';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import AuthModal from './components/auth/AuthModal';
 import CabinetModal from './components/auth/CabinetModal';
-
-function FeaturesSection() {
-  const features = [
-    {
-      icon: Shield,
-      title: 'Безпека та надійність',
-      desc: 'Досвідчені водії, технічно справні MB Sprinter та VW Crafter з 2024 року',
-    },
-    {
-      icon: Clock,
-      title: 'Точний розклад',
-      desc: 'Рейси щодня без вихідних. Точне відправлення за розкладом',
-    },
-    {
-      icon: Star,
-      title: 'Преміум комфорт',
-      desc: 'просторий салон, клімат-контроль, м\'які сидіння та чистота',
-    },
-    {
-      icon: Wifi,
-      title: 'Онлайн бронювання',
-      desc: 'Зручне бронювання онлайн з підтвердженням на телефон',
-    },
-  ];
-
-  return (
-    <section className="max-w-6xl mx-auto px-4 py-10">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {features.map(({ icon: Icon, title, desc }, idx) => (
-          <motion.div
-            key={title}
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: idx * 0.1 }}
-            className="card-hover p-5 group"
-          >
-            <div className="w-11 h-11 bg-brand-yellow/10 border border-brand-yellow/20 rounded-xl flex items-center justify-center mb-4 group-hover:bg-brand-yellow/20 transition-colors">
-              <Icon size={22} className="text-brand-yellow" />
-            </div>
-            <h3 className="text-white font-semibold mb-2 text-sm">{title}</h3>
-            <p className="text-brand-muted text-xs leading-relaxed">{desc}</p>
-          </motion.div>
-        ))}
-      </div>
-    </section>
-  );
-}
 
 function MainApp() {
   const [paymentData, setPaymentData] = useState<BookingData | null>(null);
@@ -86,7 +37,6 @@ function MainApp() {
       <main>
         <Hero onBookNow={scrollToBooking} />
         <BookingForm onPay={setPaymentData} />
-        <FeaturesSection />
         <ScheduleBlock />
         <TransfersBlock />
         <ReviewsBlock />
