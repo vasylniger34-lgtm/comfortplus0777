@@ -56,7 +56,7 @@ export default function Footer() {
             <div className="space-y-3">
               <div className="flex items-start gap-3 text-brand-muted text-sm">
                 <MapPin size={16} className="text-brand-yellow mt-0.5 flex-shrink-0" />
-                <span>Маршрут: Львів — Стебник — Трускавець — Борислав — Східниця</span>
+                <span>Напрямок: Львів ↔ Стебник ↔ Трускавець ↔ Борислав ↔ Східниця</span>
               </div>
               <div className="flex items-center gap-3 text-brand-muted text-sm">
                 <Clock size={16} className="text-brand-yellow flex-shrink-0" />
