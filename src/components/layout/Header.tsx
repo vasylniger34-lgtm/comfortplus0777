@@ -21,7 +21,7 @@ export default function Header({ onBookNow, onOpenCabinet }: HeaderProps) {
   }, []);
 
   const navLinks = [
-    { label: 'Напрямки', href: '#booking' },
+    { label: 'Маршрути', href: '#schedule' },
     { label: 'Бронювання', href: '#booking' },
     { label: 'Відгуки', href: '#reviews' },
     { label: 'Контакти', href: '#contacts' },

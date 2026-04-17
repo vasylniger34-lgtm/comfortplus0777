@@ -20,7 +20,7 @@ export default function Footer() {
               </div>
             </div>
             <p className="text-brand-muted text-sm leading-relaxed">
-              Преміум перевезення на напрямку Львів–Стебник–Трускавець–Борислав–Східниця. 
+              Преміум перевезення на маршруті Львів–Стебник–Трускавець–Борислав–Східниця. 
               Щоденні рейси. Комфорт та безпека.
             </p>
           </div>
@@ -56,15 +56,15 @@ export default function Footer() {
             <div className="space-y-3">
               <div className="flex items-start gap-3 text-brand-muted text-sm">
                 <MapPin size={16} className="text-brand-yellow mt-0.5 flex-shrink-0" />
-                <span>Напрямок: Львів — Стебник — Трускавець — Борислав — Східниця</span>
+                <span>Маршрут: Львів — Стебник — Трускавець — Борислав — Східниця</span>
               </div>
               <div className="flex items-center gap-3 text-brand-muted text-sm">
                 <Clock size={16} className="text-brand-yellow flex-shrink-0" />
-                <span>Щоденні рейси з 05:50 до 20:40</span>
+                <span>Щоденні рейси з 05:50 до 17:40</span>
               </div>
               <div className="flex items-center gap-3 text-brand-muted text-sm">
                 <Bus size={16} className="text-brand-yellow flex-shrink-0" />
-                <span>Mercedes Sprinter та Volkswagen Crafter • по 12 місць</span>
+                <span>MB Sprinter та VW Crafter • по 12 місць</span>
               </div>
             </div>
           </div>
