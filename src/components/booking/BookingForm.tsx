@@ -471,7 +471,7 @@ export default function BookingForm({ onPay }: BookingFormProps) {
                 >
                   <h3 className="section-title text-2xl mb-8 flex items-center gap-3 pt-4 border-t border-brand-border">
                     <span className="w-8 h-8 rounded-full bg-brand-yellow text-brand-dark flex items-center justify-center text-sm font-black">2</span>
-                    Оберіть маршрут (два кліки)
+                    {!from ? 'Оберіть місто відправлення' : 'Тепер оберіть місто прибуття'}
                   </h3>
                   
                   <div className="relative">

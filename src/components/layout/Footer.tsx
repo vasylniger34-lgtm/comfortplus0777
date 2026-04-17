@@ -20,7 +20,7 @@ export default function Footer() {
               </div>
             </div>
             <p className="text-brand-muted text-sm leading-relaxed">
-              Преміум перевезення на маршруті Львів–Стебник–Трускавець–Борислав–Східниця. 
+              Преміум перевезення на напрямку Львів–Стебник–Трускавець–Борислав–Східниця. 
               Щоденні рейси. Комфорт та безпека.
             </p>
           </div>
@@ -73,9 +73,6 @@ export default function Footer() {
         <div className="mt-10 pt-6 border-t border-brand-border flex flex-col md:flex-row items-center justify-between gap-3">
           <p className="text-brand-muted text-xs">
             © {currentYear} Comfort Plus 0777. Всі права захищено.
-          </p>
-          <p className="text-brand-muted text-xs">
-            Преміум перевезення між Львовом та Східницею
           </p>
         </div>
       </div>

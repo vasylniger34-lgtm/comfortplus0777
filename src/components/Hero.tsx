@@ -11,10 +11,10 @@ interface HeroProps {
 export default function Hero({ onBookNow }: HeroProps) {
   const [isHovered, setIsHovered] = useState(false);
   const comfortFeatures = [
-    { icon: Bus, label: 'MB Sprinter & VW Crafter', desc: 'Сучасний автопарк' },
-    { icon: Thermometer, label: 'Клімат-контроль', desc: 'Комфорт у будь-яку погоду' },
+    { icon: Bus, label: 'Mercedes Sprinter & Volkswagen Crafter', desc: 'Сучасний таксопарк' },
+    { icon: Thermometer, label: 'Клімат-контроль', desc: 'Кондиціонери та додаткові обігрівачі' },
     { icon: Wifi, label: 'Wi-Fi & USB', desc: 'Завжди на зв\'язку' },
-    { icon: Zap, label: 'Щоденні рейси', desc: 'Без вихідних' },
+    { icon: Zap, label: 'щодня', desc: 'з 5 50 до 20 40 без вихідних' },
   ];
 
   const nextDepartureTime = (() => {
@@ -57,7 +57,7 @@ export default function Hero({ onBookNow }: HeroProps) {
         >
           <div className="inline-flex items-center gap-2 bg-brand-yellow/10 border border-brand-yellow/20 rounded-full px-4 py-2">
             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-            <span className="text-brand-yellow text-sm font-medium">Наступний рейс о {nextDepartureTime}</span>
+            <span className="text-brand-yellow text-sm font-medium">найближчий вільний водій о {nextDepartureTime}</span>
           </div>
         </motion.div>
 
@@ -97,7 +97,7 @@ export default function Hero({ onBookNow }: HeroProps) {
           <p className="text-brand-light text-lg md:text-xl max-w-xl mx-auto leading-relaxed mt-4">
             Комфортні пасажирські перевезення
             <br />
-            <span className="text-brand-yellow font-medium italic">щоденно · в обох напрямках</span>
+            <span className="text-brand-yellow font-medium italic">щодня</span>
           </p>
         </motion.div>
 
@@ -116,7 +116,7 @@ export default function Hero({ onBookNow }: HeroProps) {
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
                   <div className="w-2 h-2 bg-brand-yellow rounded-full animate-pulse" />
-                  <div className="text-brand-muted text-[10px] uppercase tracking-[0.2em] font-black">Маршрут</div>
+                  <div className="text-brand-muted text-[10px] uppercase tracking-[0.2em] font-black">Напрямок</div>
                 </div>
                 <div className="bg-brand-yellow/10 px-3 py-1 rounded-full border border-brand-yellow/20">
                   <span className="text-brand-yellow text-[10px] font-bold uppercase tracking-tighter">Live Розклад</span>
@@ -146,27 +146,11 @@ export default function Hero({ onBookNow }: HeroProps) {
                 ))}
               </div>
 
-              {/* Price + next departure + CTA */}
-              <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-4 border-t border-brand-border/50">
-                <div className="flex gap-6 sm:gap-8">
-                  <div>
-                    <div className="text-brand-muted text-[10px] uppercase font-bold tracking-widest mb-1 opacity-50">Комфорт</div>
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-brand-yellow font-display font-bold text-xl sm:text-2xl">Premium</span>
-                      <span className="text-brand-yellow text-sm font-bold uppercase">клас</span>
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-brand-muted text-[10px] uppercase font-bold tracking-widest mb-1 opacity-50">16+ рейсів</div>
-                    <div className="bg-white/5 px-3 py-1.5 rounded-lg border border-white/10">
-                      <span className="text-white font-display font-black text-xl">щодня</span>
-                    </div>
-                  </div>
-                </div>
-                
+              {/* Final CTA Button ONLY */}
+              <div className="flex justify-center pt-4 border-t border-brand-border/50">
                 <button
                   onClick={onBookNow}
-                  className="btn-primary w-full sm:w-auto px-10 py-4 text-dark font-black flex items-center justify-center gap-3 group/btn shadow-brand-lg text-lg"
+                  className="btn-primary w-full px-10 py-4 text-dark font-black flex items-center justify-center gap-3 group/btn shadow-brand-lg text-lg"
                 >
                   ЗАБРОНЮВАТИ
                   <ArrowRight size={20} className="group-hover/btn:translate-x-1 transition-transform" />
@@ -202,21 +186,28 @@ export default function Hero({ onBookNow }: HeroProps) {
           ))}
         </motion.div>
 
-        {/* Phone numbers */}
+        {/* Phone numbers section */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.8 }}
-          className="flex justify-center gap-6 mt-8 text-brand-muted text-sm"
+          className="flex flex-col items-center gap-4 mt-12"
         >
-          <a href={`tel:${CONTACTS.phone1}`} className="hover:text-brand-yellow transition-colors flex items-center gap-1.5">
-            <div className="w-1.5 h-1.5 bg-green-500 rounded-full" />
-            {CONTACTS.phone1Display}
-          </a>
-          <a href={`tel:${CONTACTS.phone2}`} className="hover:text-brand-yellow transition-colors flex items-center gap-1.5">
-            <div className="w-1.5 h-1.5 bg-green-500 rounded-full" />
-            {CONTACTS.phone2Display}
-          </a>
+          <p className="text-brand-light font-bold text-base md:text-lg mb-2">Бронюйте за номером телефону або оберіть напрямок</p>
+          <div className="flex flex-col md:flex-row justify-center gap-8 md:gap-16">
+            <a href={`tel:${CONTACTS.phone1}`} className="hover:text-brand-yellow transition-all flex items-center gap-4 group scale-110 md:scale-125">
+              <div className="w-10 h-10 bg-brand-yellow rounded-full flex items-center justify-center group-hover:bg-brand-yellow/80 shadow-brand group-hover:scale-110 transition-all">
+                <Bus size={20} className="text-brand-dark" />
+              </div>
+              <span className="text-white font-display font-black text-2xl md:text-3xl tracking-tight">{CONTACTS.phone1Display}</span>
+            </a>
+            <a href={`tel:${CONTACTS.phone2}`} className="hover:text-brand-yellow transition-all flex items-center gap-4 group scale-110 md:scale-125">
+              <div className="w-10 h-10 bg-brand-yellow rounded-full flex items-center justify-center group-hover:bg-brand-yellow/80 shadow-brand group-hover:scale-110 transition-all">
+                <Bus size={20} className="text-brand-dark" />
+              </div>
+              <span className="text-white font-display font-black text-2xl md:text-3xl tracking-tight">{CONTACTS.phone2Display}</span>
+            </a>
+          </div>
         </motion.div>
 
         {/* Scroll indicator */}
