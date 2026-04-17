@@ -36,7 +36,7 @@ export default function ScheduleBlock() {
         className="text-center mb-10"
       >
         <div className="label mb-3">Щоденні рейси</div>
-        <h2 className="section-title mb-3">Розклад маршрутів</h2>
+        <h2 className="section-title mb-3">Розклад напрямків</h2>
         <p className="text-brand-muted max-w-md mx-auto">
           Відправлення кожні 40–90 хвилин протягом дня
         </p>

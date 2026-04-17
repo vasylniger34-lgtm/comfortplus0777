@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { ArrowRight, ChevronDown, Zap, Bus, Thermometer, Wifi, ArrowLeftRight } from 'lucide-react';
+import { ArrowRight, ChevronDown, Zap, Bus, Thermometer, Wifi, ArrowLeftRight, Phone } from 'lucide-react';
 import { CONTACTS } from '../data/routes';
 
 import { useState } from 'react';
@@ -11,10 +11,10 @@ interface HeroProps {
 export default function Hero({ onBookNow }: HeroProps) {
   const [isHovered, setIsHovered] = useState(false);
   const comfortFeatures = [
-    { icon: Bus, label: 'MB Sprinter & VW Crafter', desc: 'Сучасний автопарк' },
-    { icon: Thermometer, label: 'Клімат-контроль', desc: 'Комфорт у будь-яку погоду' },
+    { icon: Bus, label: 'Mercedes Sprinter & Volkswagen Crafter', desc: 'Сучасний автопарк' },
+    { icon: Thermometer, label: 'Кондиціонери та додаткові обігрівачі', desc: 'Комфорт у будь-яку погоду' },
     { icon: Wifi, label: 'Wi-Fi & USB', desc: 'Завжди на зв\'язку' },
-    { icon: Zap, label: 'Щоденні рейси', desc: 'Без вихідних' },
+    { icon: Zap, label: 'щодня з 05:50 до 20:40', desc: 'Без вихідних' },
   ];
 
   const nextDepartureTime = (() => {
@@ -57,7 +57,7 @@ export default function Hero({ onBookNow }: HeroProps) {
         >
           <div className="inline-flex items-center gap-2 bg-brand-yellow/10 border border-brand-yellow/20 rounded-full px-4 py-2">
             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-            <span className="text-brand-yellow text-sm font-medium">Наступний рейс о {nextDepartureTime}</span>
+            <span className="text-brand-yellow text-sm font-medium">Найближчий вільний водій {nextDepartureTime}</span>
           </div>
         </motion.div>
 
@@ -101,81 +101,6 @@ export default function Hero({ onBookNow }: HeroProps) {
           </p>
         </motion.div>
 
-        {/* CTA Block — the main booking trigger */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-          className="max-w-2xl mx-auto mb-10"
-        >
-          <div className="card p-6 md:p-8 bg-brand-surface/40 backdrop-blur-xl border-brand-yellow/20 shadow-2xl relative overflow-hidden group">
-            <div className="absolute -top-24 -right-24 w-48 h-48 bg-brand-yellow/10 rounded-full blur-3xl group-hover:bg-brand-yellow/20 transition-colors duration-700" />
-            
-            <div className="relative z-10">
-              {/* Route visualization */}
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 bg-brand-yellow rounded-full animate-pulse" />
-                  <div className="text-brand-muted text-[10px] uppercase tracking-[0.2em] font-black">Маршрут</div>
-                </div>
-                <div className="bg-brand-yellow/10 px-3 py-1 rounded-full border border-brand-yellow/20">
-                  <span className="text-brand-yellow text-[10px] font-bold uppercase tracking-tighter">Live Розклад</span>
-                </div>
-              </div>
-              
-              {/* Compact route */}
-              <div className="flex items-center justify-between gap-2 mb-6">
-                {['Львів', 'Стебник', 'Трускавець', 'Борислав', 'Східниця'].map((stop, idx, arr) => (
-                  <div key={stop} className="flex items-center gap-2 flex-1">
-                    <div className="flex flex-col items-center flex-shrink-0">
-                      <div className={`w-3 h-3 rounded-full border-2 z-10 ${
-                        idx === 0 || idx === arr.length - 1
-                          ? 'bg-brand-yellow border-brand-yellow shadow-brand'
-                          : 'bg-brand-dark border-brand-border'
-                      }`} />
-                      <div className={`font-display font-black text-[9px] sm:text-[10px] mt-1 uppercase tracking-tight ${
-                        idx === 0 || idx === arr.length - 1 ? 'text-brand-yellow' : 'text-white/70'
-                      }`}>
-                        {stop}
-                      </div>
-                    </div>
-                    {idx < arr.length - 1 && (
-                      <div className="h-[2px] flex-1 bg-brand-border min-w-2" />
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              {/* Price + next departure + CTA */}
-              <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-4 border-t border-brand-border/50">
-                <div className="flex gap-6 sm:gap-8">
-                  <div>
-                    <div className="text-brand-muted text-[10px] uppercase font-bold tracking-widest mb-1 opacity-50">Комфорт</div>
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-brand-yellow font-display font-bold text-xl sm:text-2xl">Premium</span>
-                      <span className="text-brand-yellow text-sm font-bold uppercase">клас</span>
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-brand-muted text-[10px] uppercase font-bold tracking-widest mb-1 opacity-50">16+ рейсів</div>
-                    <div className="bg-white/5 px-3 py-1.5 rounded-lg border border-white/10">
-                      <span className="text-white font-display font-black text-xl">щодня</span>
-                    </div>
-                  </div>
-                </div>
-                
-                <button
-                  onClick={onBookNow}
-                  className="btn-primary w-full sm:w-auto px-10 py-4 text-dark font-black flex items-center justify-center gap-3 group/btn shadow-brand-lg text-lg"
-                >
-                  ЗАБРОНЮВАТИ
-                  <ArrowRight size={20} className="group-hover/btn:translate-x-1 transition-transform" />
-                </button>
-              </div>
-            </div>
-          </div>
-        </motion.div>
-
         {/* Comfort features — bottom strip */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -185,7 +110,7 @@ export default function Hero({ onBookNow }: HeroProps) {
         >
           {comfortFeatures.map(({ icon: Icon, label, desc }, idx) => (
             <motion.div
-              key={label}
+              key={idx}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.5 + idx * 0.1 }}
@@ -202,21 +127,30 @@ export default function Hero({ onBookNow }: HeroProps) {
           ))}
         </motion.div>
 
-        {/* Phone numbers */}
+        {/* Phone numbers section */}
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.8 }}
-          className="flex justify-center gap-6 mt-8 text-brand-muted text-sm"
+          className="flex flex-col items-center mt-12"
         >
-          <a href={`tel:${CONTACTS.phone1}`} className="hover:text-brand-yellow transition-colors flex items-center gap-1.5">
-            <div className="w-1.5 h-1.5 bg-green-500 rounded-full" />
-            {CONTACTS.phone1Display}
-          </a>
-          <a href={`tel:${CONTACTS.phone2}`} className="hover:text-brand-yellow transition-colors flex items-center gap-1.5">
-            <div className="w-1.5 h-1.5 bg-green-500 rounded-full" />
-            {CONTACTS.phone2Display}
-          </a>
+          <p className="text-brand-muted text-sm font-medium mb-4 italic">
+            Бронюйте за номером телефону або оберіть напрямок
+          </p>
+          <div className="flex flex-col sm:flex-row justify-center gap-6 sm:gap-12">
+            <a href={`tel:${CONTACTS.phone1}`} className="group flex items-center gap-3 text-brand-light hover:text-brand-yellow transition-all duration-300">
+              <div className="w-10 h-10 rounded-full bg-brand-yellow/10 flex items-center justify-center group-hover:bg-brand-yellow/20 transition-colors">
+                <Phone size={24} className="text-brand-yellow" />
+              </div>
+              <span className="text-lg font-bold tracking-wide">{CONTACTS.phone1Display}</span>
+            </a>
+            <a href={`tel:${CONTACTS.phone2}`} className="group flex items-center gap-3 text-brand-light hover:text-brand-yellow transition-all duration-300">
+              <div className="w-10 h-10 rounded-full bg-brand-yellow/10 flex items-center justify-center group-hover:bg-brand-yellow/20 transition-colors">
+                <Phone size={24} className="text-brand-yellow" />
+              </div>
+              <span className="text-lg font-bold tracking-wide">{CONTACTS.phone2Display}</span>
+            </a>
+          </div>
         </motion.div>
 
         {/* Scroll indicator */}
@@ -226,7 +160,7 @@ export default function Hero({ onBookNow }: HeroProps) {
           transition={{ delay: 1.2 }}
           className="flex flex-col items-center gap-2 mt-10"
         >
-          <span className="text-brand-muted text-xs">Оберіть маршрут та забронюйте</span>
+          <span className="text-brand-muted text-xs">Оберіть напрямок та забронюйте</span>
           <motion.div
             animate={{ y: [0, 6, 0] }}
             transition={{ duration: 1.5, repeat: Infinity }}

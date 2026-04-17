@@ -242,7 +242,7 @@ export default function BookingForm({ onPay }: BookingFormProps) {
       
       if (toIdx > fromIdx) {
         setTo(stopId);
-        // Перевірка на короткий маршрут (тільки за телефоном)
+        // Перевірка на короткий напрямок (тільки за телефоном)
         const isShort = from !== 'lviv' && stopId !== 'lviv';
         if (isShort) setShowCallModal(true);
       } else {
@@ -268,7 +268,7 @@ export default function BookingForm({ onPay }: BookingFormProps) {
 
   const validate = () => {
     const errs: Record<string, string> = {};
-    if (!from || !to) errs.route = "Оберіть маршрут (Звідки та Куди)";
+    if (!from || !to) errs.route = "Оберіть напрямок (Звідки та Куди)";
     if (!date) errs.date = "Оберіть дату";
     if (!selectedTime) errs.time = "Оберіть час";
     if (selectedTime && !pickupLocation) errs.pickupLocation = "Оберіть зупинку для посадки";
@@ -285,7 +285,7 @@ export default function BookingForm({ onPay }: BookingFormProps) {
     const isForbidden = (price === 0);
 
     if (isForbidden && from && to) {
-        setErrors({ route: "Даний маршрут недоступний для бронювання." });
+        setErrors({ route: "Даний напрямок недоступний для бронювання." });
         return;
     }
 
@@ -471,7 +471,7 @@ export default function BookingForm({ onPay }: BookingFormProps) {
                 >
                   <h3 className="section-title text-2xl mb-8 flex items-center gap-3 pt-4 border-t border-brand-border">
                     <span className="w-8 h-8 rounded-full bg-brand-yellow text-brand-dark flex items-center justify-center text-sm font-black">2</span>
-                    Оберіть маршрут (два кліки)
+                    Оберіть напрямок (два кліки)
                   </h3>
                   
                   <div className="relative">
@@ -523,7 +523,7 @@ export default function BookingForm({ onPay }: BookingFormProps) {
                     {(isForbidden || errors.route) && (
                       <div className="mt-4 bg-red-500/10 border border-red-500/20 p-4 rounded-xl text-red-500 text-sm flex items-center gap-3 justify-center">
                         <AlertCircle size={18} />
-                        <span>{errors.route || "Даний маршрут недоступний для бронювання."}</span>
+                        <span>{errors.route || "Даний напрямок недоступний для бронювання."}</span>
                       </div>
                     )}
                   </div>

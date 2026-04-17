@@ -6,7 +6,6 @@ import Footer from './components/layout/Footer';
 import Hero from './components/Hero';
 import BookingForm from './components/booking/BookingForm';
 import PaymentModal from './components/payment/PaymentModal';
-import ScheduleBlock from './components/schedule/ScheduleBlock';
 import ReviewsBlock from './components/reviews/ReviewsBlock';
 import ChatWidget from './components/chat/ChatWidget';
 import TransfersBlock from './components/transfers/TransfersBlock';
@@ -37,7 +36,6 @@ function MainApp() {
       <main>
         <Hero onBookNow={scrollToBooking} />
         <BookingForm onPay={setPaymentData} />
-        <ScheduleBlock />
         <TransfersBlock />
         <ReviewsBlock />
       </main>
