@@ -118,9 +118,7 @@ export default function Hero({ onBookNow }: HeroProps) {
                   <div className="w-2 h-2 bg-brand-yellow rounded-full animate-pulse" />
                   <div className="text-brand-muted text-[10px] uppercase tracking-[0.2em] font-black">Напрямок</div>
                 </div>
-                <div className="bg-brand-yellow/10 px-3 py-1 rounded-full border border-brand-yellow/20">
-                  <span className="text-brand-yellow text-[10px] font-bold uppercase tracking-tighter">Live Розклад</span>
-                </div>
+
               </div>
               
               {/* Compact route */}
