@@ -14,7 +14,7 @@ export default function Hero({ onBookNow }: HeroProps) {
     { icon: Bus, label: 'Mercedes Sprinter & Volkswagen Crafter', desc: 'Сучасний таксопарк' },
     { icon: Thermometer, label: 'Клімат-контроль', desc: 'Кондиціонери та додаткові обігрівачі' },
     { icon: Wifi, label: 'Wi-Fi & USB', desc: 'Завжди на зв\'язку' },
-    { icon: Zap, label: 'щодня', desc: 'з 5 50 до 20 40 без вихідних' },
+    { icon: Zap, label: 'щодня', desc: 'з 5:50 до 20:40 без вихідних' },
   ];
 
   const nextDepartureTime = (() => {

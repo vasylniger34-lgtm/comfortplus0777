@@ -60,11 +60,11 @@ export default function Footer() {
               </div>
               <div className="flex items-center gap-3 text-brand-muted text-sm">
                 <Clock size={16} className="text-brand-yellow flex-shrink-0" />
-                <span>Щоденні рейси з 05:50 до 17:40</span>
+                <span>Відправлення щодня з 5:50 до 20:40</span>
               </div>
               <div className="flex items-center gap-3 text-brand-muted text-sm">
                 <Bus size={16} className="text-brand-yellow flex-shrink-0" />
-                <span>MB Sprinter та VW Crafter • по 12 місць</span>
+                <span>Mercedes Sprinter та Volkswagen Crafter</span>
               </div>
             </div>
           </div>
