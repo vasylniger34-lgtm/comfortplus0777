@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { ArrowRight, ChevronDown, Zap, Bus, Thermometer, Wifi, ArrowLeftRight } from 'lucide-react';
+import { ArrowRight, ChevronDown, Zap, Bus, Thermometer, Wifi, ArrowLeftRight, Phone } from 'lucide-react';
 import { CONTACTS } from '../data/routes';
 
 import { useState } from 'react';

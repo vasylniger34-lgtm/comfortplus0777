@@ -12,23 +12,30 @@ export default function TransfersBlock() {
             <div>
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-yellow/10 border border-brand-yellow/20 text-brand-yellow text-sm font-medium mb-4">
                 <Users size={16} />
-                Індивідуальні Трансфери
+                Пасажирські перевезення
               </div>
               <h2 className="text-3xl md:text-4xl font-display font-bold text-white mb-4">
-                Оренда великих мікроавтобусів (20 місць)
+                Надаємо послуги пасажирських перевезень від 9 до 20 місць
               </h2>
-              <p className="text-brand-muted mb-6 leading-relaxed">
-                Шукаєте транспорт для великої групи? Ми пропонуємо комфортабельні мікроавтобуси MB Sprinter та VW Crafter на 20 місць для індивідуального бронювання. Ідеально підходить для екскурсій, корпоративних поїздок або святкових подій.
-              </p>
-              
               <ul className="space-y-3 mb-8">
-                {['Лише за попереднім бронюванням', 'Досвідчений водій в комплекті', 'Клімат-контроль та м\'які сидіння'].map(item => (
+                {[
+                  'індивідуальні поїздки',
+                  'трансфери в аеропорти та на вокзали',
+                  'шкільні екскурсії',
+                  'розвозка персоналу',
+                  'весілля, ювілеї, похорон та ін.'
+                ].map(item => (
                   <li key={item} className="flex items-center gap-3 text-brand-light">
                     <div className="w-1.5 h-1.5 rounded-full bg-brand-yellow" />
                     {item}
                   </li>
                 ))}
               </ul>
+              <p className="text-brand-muted mb-6 leading-relaxed">
+                Комфортні автобуси, обладнані усіма необхідними опціями зокрема кондиціонери, обігрівачі Вебасто.
+                <br />
+                <span className="text-brand-yellow font-bold mt-2 block">Будь яка форма оплати.</span>
+              </p>
             </div>
             
             <div className="bg-brand-dark rounded-2xl p-6 md:p-8 border border-brand-border text-center flex flex-col items-center justify-center">
