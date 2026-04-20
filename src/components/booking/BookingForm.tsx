@@ -65,7 +65,10 @@ export const PICKUP_LOCATIONS: Record<string, {name: string, link: string}[]> = 
   ],
   lviv: [
     { name: 'Головний залізничний вокзал (Платна парковка)', link: 'https://maps.app.goo.gl/v3G8L1S5M2R4G7B9A' },
-    { name: 'ТЦ Скриня', link: 'https://maps.app.goo.gl/v9M1L5S2R3G4B8A7L' }
+    { name: 'ТЦ Скриня', link: 'https://maps.app.goo.gl/v9M1L5S2R3G4B8A7L' },
+    { name: '«ЖК Парус»', link: '' },
+    { name: 'ТЦ «АШАН»', link: '' },
+    { name: 'ТЦ Victoria Gardens Автосалон Toyota', link: '' }
   ]
 };
 

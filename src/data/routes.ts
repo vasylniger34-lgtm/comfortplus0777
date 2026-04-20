@@ -22,15 +22,15 @@ export const STOPS: Stop[] = [
 
 export const ROUTE_PRICES: Record<string, number> = {
   // Routes available for online booking
-  'lviv-stebnik': 200,
-  'lviv-truskavets': 250,
-  'lviv-boryslav': 250,
-  'lviv-skhidnytsia': 300,
+  'lviv-stebnik': 250,
+  'lviv-truskavets': 300,
+  'lviv-boryslav': 300,
+  'lviv-skhidnytsia': 350,
   
-  'stebnik-lviv': 200,
-  'truskavets-lviv': 250,
-  'boryslav-lviv': 250,
-  'skhidnytsia-lviv': 300,
+  'stebnik-lviv': 250,
+  'truskavets-lviv': 300,
+  'boryslav-lviv': 300,
+  'skhidnytsia-lviv': 350,
 
   // Routes bookable only by phone (setting price to 0 or keeping for reference, 
   // but logic in form should redirect to phone)
