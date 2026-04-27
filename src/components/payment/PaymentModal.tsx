@@ -149,11 +149,18 @@ export default function PaymentModal({ data, onClose }: PaymentModalProps) {
                   Оберіть спосіб оплати
                 </p>
 
+                <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-4 mb-2">
+                  <p className="text-red-400 text-sm font-medium text-center">
+                    ⚠️ Онлайн-оплата тимчасово недоступна з технічних причин. 
+                    Будь ласка, зверніться до диспетчера для бронювання.
+                  </p>
+                </div>
+
                 {/* Balance payment */}
                 {user && (user.balance || 0) >= data.price && (
                   <button
-                    onClick={() => handlePay('balance')}
-                    className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl bg-green-500/10 border border-green-500/30 text-green-400 font-bold text-base hover:bg-green-500/20 active:scale-98 transition-all duration-150"
+                    disabled
+                    className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl bg-green-500/10 border border-green-500/30 text-green-400/50 font-bold text-base cursor-not-allowed"
                   >
                     💚 Оплатити з балансу ({user.balance} грн)
                   </button>
@@ -161,8 +168,8 @@ export default function PaymentModal({ data, onClose }: PaymentModalProps) {
 
                 {/* Apple Pay */}
                 <button
-                  onClick={() => handlePay('applepay')}
-                  className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl bg-white text-black font-semibold text-base hover:bg-gray-100 active:scale-98 transition-all duration-150 shadow-md"
+                  disabled
+                  className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl bg-white/50 text-black/50 font-semibold text-base cursor-not-allowed shadow-md"
                 >
                   <svg viewBox="0 0 24 24" className="w-6 h-6" fill="currentColor">
                     <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
@@ -172,8 +179,8 @@ export default function PaymentModal({ data, onClose }: PaymentModalProps) {
 
                 {/* Google Pay */}
                 <button
-                  onClick={() => handlePay('googlepay')}
-                  className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl bg-brand-surface border border-brand-border text-white font-semibold text-base hover:bg-brand-border active:scale-98 transition-all duration-150"
+                  disabled
+                  className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl bg-brand-surface/50 border border-brand-border text-white/50 font-semibold text-base cursor-not-allowed"
                 >
                   <svg viewBox="0 0 24 24" className="w-6 h-6">
                     <path d="M12 24c6.627 0 12-5.373 12-12S18.627 0 12 0 0 5.373 0 12s5.373 12 12 12z" fill="#fff"/>
@@ -200,8 +207,8 @@ export default function PaymentModal({ data, onClose }: PaymentModalProps) {
 
                 {/* Card payment */}
                 <button
-                  onClick={() => handlePay('card')}
-                  className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl bg-brand-yellow text-brand-dark font-bold text-base hover:bg-brand-gold active:scale-98 transition-all duration-150 shadow-brand"
+                  disabled
+                  className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl bg-brand-yellow/50 text-brand-dark/50 font-bold text-base cursor-not-allowed shadow-brand"
                 >
                   💳 Оплатити карткою · {data.price} грн
                 </button>
