@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 
 import Header from './components/layout/Header';
@@ -16,6 +17,34 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import AuthModal from './components/auth/AuthModal';
 import CabinetModal from './components/auth/CabinetModal';
 import LegalModal from './components/legal/LegalModal';
+import { PrivacyPolicy, PublicOffer, RefundPolicy } from './components/legal/PolicyContent';
+
+function HomePage({ 
+  scrollToBooking, 
+  setPaymentData 
+}: { 
+  scrollToBooking: () => void; 
+  setPaymentData: (data: BookingData | null) => void 
+}) {
+  return (
+    <main>
+      <Hero onBookNow={scrollToBooking} />
+      <BookingForm onPay={setPaymentData} />
+      <TransfersBlock />
+      <ReviewsBlock />
+    </main>
+  );
+}
+
+function LegalPage({ content: Content, title }: { content: React.FC, title: string }) {
+  return (
+    <main className="pt-32 pb-20 max-w-4xl mx-auto px-4">
+      <div className="bg-brand-surface border border-brand-border rounded-3xl p-8 md:p-12 shadow-2xl">
+        <Content />
+      </div>
+    </main>
+  );
+}
 
 function MainApp() {
   const [paymentData, setPaymentData] = useState<BookingData | null>(null);
@@ -29,7 +58,12 @@ function MainApp() {
   const { user } = useAuth();
 
   const scrollToBooking = () => {
-    document.getElementById('booking')?.scrollIntoView({ behavior: 'smooth' });
+    const bookingElement = document.getElementById('booking');
+    if (bookingElement) {
+      bookingElement.scrollIntoView({ behavior: 'smooth' });
+    } else {
+      window.location.href = '/#booking';
+    }
   };
 
   const openLegal = (type: 'privacy' | 'terms' | 'refund') => {
@@ -43,19 +77,17 @@ function MainApp() {
         onOpenCabinet={() => user ? setIsCabinetOpen(true) : setIsAuthOpen(true)}
       />
       
-      <main>
-        <Hero onBookNow={scrollToBooking} />
-        <BookingForm onPay={setPaymentData} />
-        <TransfersBlock />
-        <ReviewsBlock />
-      </main>
+      <Routes>
+        <Route path="/" element={<HomePage scrollToBooking={scrollToBooking} setPaymentData={setPaymentData} />} />
+        <Route path="/oferta" element={<LegalPage content={PublicOffer} title="Договір оферти" />} />
+        <Route path="/konfidenciinist" element={<LegalPage content={PrivacyPolicy} title="Політика конфіденційності" />} />
+        <Route path="/povernenya" element={<LegalPage content={RefundPolicy} title="Повернення та оплата" />} />
+      </Routes>
 
       <Footer onOpenLegal={openLegal} />
 
-      {/* Floating chat widget */}
       <ChatWidget />
 
-      {/* Modals */}
       <AnimatePresence>
         {paymentData && (
           <PaymentModal
@@ -77,10 +109,13 @@ function MainApp() {
 
 function App() {
   return (
-    <AuthProvider>
-      <MainApp />
-    </AuthProvider>
+    <BrowserRouter>
+      <AuthProvider>
+        <MainApp />
+      </AuthProvider>
+    </BrowserRouter>
   );
 }
 
 export default App;
+
