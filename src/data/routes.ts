@@ -71,10 +71,24 @@ export function getDuration(fromId: string, toId: string): string {
 }
 
 export const CONTACTS = {
-  phone1: '+380980011900',
-  phone1Display: '098 00 119 00',
-  phone2: '+380970011900',
-  phone2Display: '097 00 119 00',
+  phone1: '+380677700090',
+  phone1Display: '067 770 00 90',
+  phone2: '+380980011900', // Keeping existing or should I remove? User only gave one.
+  phone2Display: '098 00 119 00',
   instagram: 'https://instagram.com/comfortplus0777',
   instagramHandle: '@comfortplus0777',
+  email: 'komfortplyus0777@gmail.com',
 };
+
+export const LEGAL_INFO = {
+  companyName: 'Comfort Plus 0777',
+  legalName: 'ТОВ «КОМФОРТ ПЛЮС 0777»',
+  legalAddress: 'Україна, 82195, Львівська обл., Дрогобицький р-н, село Рибник, вул. Завирська, будинок 8',
+  physicalAddress: '82100, Львівська обл., м. Дрогобич, вул. Орлика Пилипа 18/2',
+  taxId: '45876032',
+  email: 'komfortplyus0777@gmail.com',
+  bankInfo: 'UA363204780000026004924956186 в АБ "УКРГАЗБАНК" МФО 320478',
+  director: 'Маршалок Степан Степанович',
+  taxGroup: 'Платник єдиного податку 3 група 5%',
+};
+

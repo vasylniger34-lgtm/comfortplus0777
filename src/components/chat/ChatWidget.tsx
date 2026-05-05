@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageCircle, X, Send, Bot } from 'lucide-react';
+import { MessageCircle, X, Send, Bot, User, Phone } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../context/AuthContext';
 
 type Message = {
   id: string;
@@ -20,6 +21,9 @@ const BOT_REPLIES: Record<string, string> = {
   дякую: 'Радий допомогти! Гарної подорожі! 🚌✨',
 };
 
+// Список ID адміністраторів в Telegram
+const ADMIN_CHAT_IDS = ['8472692319', '8618558820']; 
+
 function getBotReply(msg: string): string {
   const lower = msg.toLowerCase();
   if (lower.includes('ціна') || lower.includes('скільки') || lower.includes('коштує')) return BOT_REPLIES.ціна;
@@ -32,7 +36,11 @@ function getBotReply(msg: string): string {
 }
 
 export default function ChatWidget() {
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
+  const [isIdentified, setIsIdentified] = useState(false);
+  const [idForm, setIdForm] = useState({ name: '', phone: '' });
+
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
@@ -47,8 +55,20 @@ export default function ChatWidget() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [sessionId, setSessionId] = useState<string>('');
 
-  // Ініціалізація сесії та завантаження історії
   useEffect(() => {
+    // Авто-заповнення якщо користувач авторизований
+    if (user) {
+        setIsIdentified(true);
+        setIdForm({ name: user.name || '', phone: user.phone || '' });
+    } else {
+        const savedName = localStorage.getItem('chat_user_name');
+        const savedPhone = localStorage.getItem('chat_user_phone');
+        if (savedName && savedPhone) {
+            setIsIdentified(true);
+            setIdForm({ name: savedName, phone: savedPhone });
+        }
+    }
+
     let sId = localStorage.getItem('chat_session_id');
     if (!sId) {
       sId = Math.random().toString(36).substring(2, 12);
@@ -76,7 +96,6 @@ export default function ChatWidget() {
 
     loadHistory();
 
-    // Підписка на нові повідомлення в реальному часі
     const channel = supabase
       .channel('chat_messages')
       .on('postgres_changes', { 
@@ -88,7 +107,6 @@ export default function ChatWidget() {
         const newMsg = payload.new;
         if (newMsg.is_bot_reply) {
           setMessages(prev => {
-            // Уникаємо дублів
             if (prev.find(m => m.id === newMsg.id)) return prev;
             return [...prev, {
               id: newMsg.id,
@@ -105,7 +123,7 @@ export default function ChatWidget() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     if (open) {
@@ -116,8 +134,17 @@ export default function ChatWidget() {
     }
   }, [open, messages]);
 
+  const handleIdentify = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (idForm.name.trim() && idForm.phone.trim()) {
+          setIsIdentified(true);
+          localStorage.setItem('chat_user_name', idForm.name);
+          localStorage.setItem('chat_user_phone', idForm.phone);
+      }
+  };
+
   const sendMessage = async () => {
-    if (!input.trim()) return;
+    if (!input.trim() || !isIdentified) return;
     
     const text = input;
     const tempId = Date.now().toString();
@@ -133,34 +160,36 @@ export default function ChatWidget() {
     setInput('');
     setTyping(true);
 
-    // 1. Запис у Supabase
     await supabase
       .from('chat_messages')
       .insert([
         { session_id: sessionId, text: text, is_bot_reply: false }
       ]);
 
-    // 2. Відправка в Telegram через API
+    // Відправка в Telegram всім адмінам
     try {
-      fetch('https://api.telegram.org/bot8615069227:AAEiCjdj66e469JqarZxWSlfzFQs1jGkr4M/sendMessage', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          chat_id: '8472692319',
-          text: `📩 Нове звернення з сайту [ID: ${sessionId}]:\n\n💬 ${text}`
-        })
-      });
+      const botToken = '8615069227:AAEiCjdj66e469JqarZxWSlfzFQs1jGkr4M';
+      const adminText = `📩 Нове звернення з сайту [ID: ${sessionId}]:\n👤 Ім'я: ${idForm.name}\n📞 Тел: ${idForm.phone}\n\n💬 ${text}`;
+      
+      for (const adminId of ADMIN_CHAT_IDS) {
+        fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            chat_id: adminId,
+            text: adminText
+          })
+        });
+      }
     } catch (e) {
       console.error('Telegram error', e);
     }
 
-    // 3. Авто-відповідь бота (якщо це не було оброблено оператором і повідомлення ще не було)
     setTimeout(() => {
       const replyText = getBotReply(text);
       if (replyText !== BOT_REPLIES.default) {
-        // Перевіряємо, чи вже було таке повідомлення в цій сесії (щоб не спамити "Ваше повідомлення надіслано")
         const alreadyNotified = messages.some(m => m.text.includes('надіслано диспетчеру'));
         
         if (replyText.includes('надіслано диспетчеру') && alreadyNotified) {
@@ -192,7 +221,7 @@ export default function ChatWidget() {
             exit={{ opacity: 0, scale: 0.9, y: 20 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
             className="absolute bottom-16 left-0 w-[320px] sm:w-[360px] card shadow-card-hover flex flex-col overflow-hidden"
-            style={{ maxHeight: '480px' }}
+            style={{ maxHeight: '520px' }}
           >
             {/* Chat header */}
             <div className="flex items-center gap-3 px-4 py-3 bg-brand-yellow/10 border-b border-brand-border">
@@ -214,103 +243,148 @@ export default function ChatWidget() {
               </button>
             </div>
 
-            {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar">
-              {messages.map((msg) => (
-                <motion.div
-                  key={msg.id}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className={`flex ${msg.from === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
-                  {msg.from === 'bot' && (
-                    <div className="w-6 h-6 bg-brand-yellow rounded-lg flex items-center justify-center mr-2 mt-1 flex-shrink-0">
-                      <Bot size={12} className="text-brand-dark" />
-                    </div>
-                  )}
-                  <div
-                    className={`max-w-[80%] px-3 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
-                      msg.from === 'user'
-                        ? 'bg-brand-yellow text-brand-dark rounded-br-sm font-medium'
-                        : 'bg-brand-surface border border-brand-border text-white rounded-bl-sm'
-                    }`}
-                  >
-                    {msg.text}
+            <div className="flex-1 flex flex-col relative overflow-hidden">
+              {!isIdentified ? (
+                <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+                  <div className="w-12 h-12 bg-brand-yellow/10 rounded-full flex items-center justify-center mb-4">
+                    <User size={24} className="text-brand-yellow" />
                   </div>
-                </motion.div>
-              ))}
+                  <h3 className="text-white font-bold mb-2">Представтеся, будь ласка</h3>
+                  <p className="text-brand-muted text-xs mb-6">
+                    Залиште ваші контакти, щоб диспетчер міг зв'язатися з вами для уточнення деталей.
+                  </p>
+                  
+                  <form onSubmit={handleIdentify} className="w-full space-y-4">
+                    <div className="relative">
+                      <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-muted" />
+                      <input
+                        required
+                        type="text"
+                        placeholder="Ваше ім'я"
+                        value={idForm.name}
+                        onChange={e => setIdForm(prev => ({ ...prev, name: e.target.value }))}
+                        className="w-full bg-brand-surface border border-brand-border rounded-xl pl-10 pr-3 py-2.5 text-sm text-white focus:outline-none focus:border-brand-yellow"
+                      />
+                    </div>
+                    <div className="relative">
+                      <Phone size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-muted" />
+                      <input
+                        required
+                        type="tel"
+                        placeholder="Номер телефону"
+                        value={idForm.phone}
+                        onChange={e => setIdForm(prev => ({ ...prev, phone: e.target.value }))}
+                        className="w-full bg-brand-surface border border-brand-border rounded-xl pl-10 pr-3 py-2.5 text-sm text-white focus:outline-none focus:border-brand-yellow"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      className="w-full bg-brand-yellow text-brand-dark font-bold py-3 rounded-xl hover:bg-brand-gold transition-colors"
+                    >
+                      Почати чат
+                    </button>
+                  </form>
+                </div>
+              ) : (
+                <>
+                  {/* Messages */}
+                  <div className="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar">
+                    {messages.map((msg) => (
+                      <motion.div
+                        key={msg.id}
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className={`flex ${msg.from === 'user' ? 'justify-end' : 'justify-start'}`}
+                      >
+                        {msg.from === 'bot' && (
+                          <div className="w-6 h-6 bg-brand-yellow rounded-lg flex items-center justify-center mr-2 mt-1 flex-shrink-0">
+                            <Bot size={12} className="text-brand-dark" />
+                          </div>
+                        )}
+                        <div
+                          className={`max-w-[80%] px-3 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
+                            msg.from === 'user'
+                              ? 'bg-brand-yellow text-brand-dark rounded-br-sm font-medium'
+                              : 'bg-brand-surface border border-brand-border text-white rounded-bl-sm'
+                          }`}
+                        >
+                          {msg.text}
+                        </div>
+                      </motion.div>
+                    ))}
 
-              {typing && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="flex justify-start"
-                >
-                  <div className="w-6 h-6 bg-brand-yellow rounded-lg flex items-center justify-center mr-2 mt-1">
-                    <Bot size={12} className="text-brand-dark" />
+                    {typing && (
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="flex justify-start"
+                      >
+                        <div className="w-6 h-6 bg-brand-yellow rounded-lg flex items-center justify-center mr-2 mt-1">
+                          <Bot size={12} className="text-brand-dark" />
+                        </div>
+                        <div className="bg-brand-surface border border-brand-border px-3 py-3 rounded-2xl rounded-bl-sm">
+                          <div className="flex gap-1">
+                            {[0, 1, 2].map(i => (
+                              <motion.div
+                                key={i}
+                                animate={{ y: [0, -4, 0] }}
+                                transition={{ delay: i * 0.15, duration: 0.6, repeat: Infinity }}
+                                className="w-1.5 h-1.5 bg-brand-muted rounded-full"
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                    <div ref={messagesEndRef} />
                   </div>
-                  <div className="bg-brand-surface border border-brand-border px-3 py-3 rounded-2xl rounded-bl-sm">
-                    <div className="flex gap-1">
-                      {[0, 1, 2].map(i => (
-                        <motion.div
-                          key={i}
-                          animate={{ y: [0, -4, 0] }}
-                          transition={{ delay: i * 0.15, duration: 0.6, repeat: Infinity }}
-                          className="w-1.5 h-1.5 bg-brand-muted rounded-full"
-                        />
-                      ))}
+
+                  {/* Quick replies */}
+                  <div className="px-3 pt-2 pb-1 flex gap-2 no-scrollbar overflow-x-auto border-t border-brand-border/50 bg-brand-surface/20">
+                    {quickReplies.map(qr => (
+                      <button
+                        key={qr}
+                        onClick={() => {
+                          setInput(qr);
+                          setTimeout(() => {
+                              const btn = document.getElementById('chat-send-btn');
+                              btn?.click();
+                          }, 10);
+                        }}
+                        className="flex-shrink-0 text-xs px-3 py-1.5 rounded-full border border-brand-yellow/30 text-brand-yellow hover:bg-brand-yellow/10 transition-all"
+                      >
+                        {qr}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Input */}
+                  <div className="p-3 border-t border-brand-border">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={input}
+                        onChange={e => setInput(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && sendMessage()}
+                        placeholder="Напишіть повідомлення..."
+                        className="flex-1 bg-brand-surface border border-brand-border rounded-xl px-3 py-2.5 text-sm text-white placeholder-brand-muted focus:outline-none focus:border-brand-yellow transition-colors"
+                      />
+                      <button
+                        id="chat-send-btn"
+                        onClick={sendMessage}
+                        className="w-10 h-10 bg-brand-yellow rounded-xl flex items-center justify-center hover:bg-brand-gold transition-colors flex-shrink-0"
+                      >
+                        <Send size={16} className="text-brand-dark" />
+                      </button>
                     </div>
                   </div>
-                </motion.div>
+                </>
               )}
-              <div ref={messagesEndRef} />
-            </div>
-
-            {/* Quick replies */}
-            <div className="px-3 pt-2 pb-1 flex gap-2 no-scrollbar overflow-x-auto">
-              {quickReplies.map(qr => (
-                <button
-                  key={qr}
-                  onClick={() => {
-                    setInput(qr);
-                    // ВикликsendMessage з невеликою затримкою для оновлення input
-                    setTimeout(() => {
-                        const btn = document.getElementById('chat-send-btn');
-                        btn?.click();
-                    }, 10);
-                  }}
-                  className="flex-shrink-0 text-xs px-3 py-1.5 rounded-full border border-brand-yellow/30 text-brand-yellow hover:bg-brand-yellow/10 transition-all"
-                >
-                  {qr}
-                </button>
-              ))}
-            </div>
-
-            {/* Input */}
-            <div className="p-3 border-t border-brand-border">
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={input}
-                  onChange={e => setInput(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && sendMessage()}
-                  placeholder="Напишіть повідомлення..."
-                  className="flex-1 bg-brand-surface border border-brand-border rounded-xl px-3 py-2.5 text-sm text-white placeholder-brand-muted focus:outline-none focus:border-brand-yellow transition-colors"
-                />
-                <button
-                  id="chat-send-btn"
-                  onClick={sendMessage}
-                  className="w-10 h-10 bg-brand-yellow rounded-xl flex items-center justify-center hover:bg-brand-gold transition-colors flex-shrink-0"
-                >
-                  <Send size={16} className="text-brand-dark" />
-                </button>
-              </div>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Toggle button */}
       <motion.button
         onClick={() => setOpen(!open)}
         whileHover={{ scale: 1.05 }}

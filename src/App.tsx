@@ -15,15 +15,25 @@ import type { BookingData } from './components/booking/BookingForm';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import AuthModal from './components/auth/AuthModal';
 import CabinetModal from './components/auth/CabinetModal';
+import LegalModal from './components/legal/LegalModal';
 
 function MainApp() {
   const [paymentData, setPaymentData] = useState<BookingData | null>(null);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isCabinetOpen, setIsCabinetOpen] = useState(false);
+  const [legalModal, setLegalModal] = useState<{ isOpen: boolean; type: 'privacy' | 'terms' | 'refund' }>({
+    isOpen: false,
+    type: 'privacy'
+  });
+  
   const { user } = useAuth();
 
   const scrollToBooking = () => {
     document.getElementById('booking')?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const openLegal = (type: 'privacy' | 'terms' | 'refund') => {
+    setLegalModal({ isOpen: true, type });
   };
 
   return (
@@ -40,7 +50,7 @@ function MainApp() {
         <ReviewsBlock />
       </main>
 
-      <Footer />
+      <Footer onOpenLegal={openLegal} />
 
       {/* Floating chat widget */}
       <ChatWidget />
@@ -55,6 +65,11 @@ function MainApp() {
         )}
         {isAuthOpen && <AuthModal onClose={() => setIsAuthOpen(false)} />}
         {isCabinetOpen && <CabinetModal onClose={() => setIsCabinetOpen(false)} />}
+        <LegalModal 
+          isOpen={legalModal.isOpen} 
+          type={legalModal.type} 
+          onClose={() => setLegalModal(prev => ({ ...prev, isOpen: false }))} 
+        />
       </AnimatePresence>
     </div>
   );

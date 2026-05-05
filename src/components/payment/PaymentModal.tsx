@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Bus } from 'lucide-react';
+import { X, Bus, CheckCircle2 } from 'lucide-react';
 import type { BookingData } from '../booking/BookingForm';
 import { STOPS } from '../../data/routes';
 import SuccessScreen from './SuccessScreen';
@@ -16,6 +16,7 @@ type PayStep = 'choose' | 'processing' | 'success';
 export default function PaymentModal({ data, onClose }: PaymentModalProps) {
   const [step, setStep] = useState<PayStep>('choose');
   const [, setMethod] = useState<'applepay' | 'googlepay' | 'card' | 'balance' | null>(null);
+  const [agreed, setAgreed] = useState(false);
   const { user, updateBalance } = useAuth();
 
   const fromStop = STOPS.find(s => s.id === data.from);
@@ -26,11 +27,15 @@ export default function PaymentModal({ data, onClose }: PaymentModalProps) {
   const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxd8ZIMLZdgaOKw7YBmbTK72mCUvy8rmRcOUvqQ2W3vZifJy3wTVbh_q-ikWL1FarXk/exec';
 
   const handlePay = async (m: 'applepay' | 'googlepay' | 'card' | 'balance') => {
+    if (!agreed && m !== 'balance') return;
+    
     setMethod(m);
     setStep('processing');
     setErrorMsg('');
     
-    // Fake payment processing delay
+    // In a real implementation, 'card' would redirect to Portmone here
+    // For now we simulate the booking process
+    
     await new Promise(r => setTimeout(r, 1500));
 
     try {
@@ -75,7 +80,6 @@ export default function PaymentModal({ data, onClose }: PaymentModalProps) {
 
     } catch (e: any) {
       setErrorMsg(e.message || 'Сталася помилка. Перевірте з\'єднання.');
-      // Auto-return to choose step
       setTimeout(() => setStep('choose'), 3000);
     }
   };
@@ -88,7 +92,6 @@ export default function PaymentModal({ data, onClose }: PaymentModalProps) {
       className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      {/* Backdrop */}
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
 
       <motion.div
@@ -101,16 +104,14 @@ export default function PaymentModal({ data, onClose }: PaymentModalProps) {
         <AnimatePresence mode="wait">
           {step === 'choose' && (
             <motion.div key="choose" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              {/* Handle bar (mobile) */}
               <div className="flex justify-center pt-3 md:hidden">
                 <div className="w-10 h-1 bg-brand-border rounded-full" />
               </div>
 
-              {/* Header */}
               <div className="flex items-center justify-between px-6 py-4 border-b border-brand-border">
                 <div>
                   <div className="text-white font-display font-bold text-lg">Оплата</div>
-                  <div className="text-brand-muted text-sm">Безпечна транзакція</div>
+                  <div className="text-brand-muted text-sm">Безпечна транзакція Portmone</div>
                 </div>
                 <button
                   onClick={onClose}
@@ -120,8 +121,7 @@ export default function PaymentModal({ data, onClose }: PaymentModalProps) {
                 </button>
               </div>
 
-              {/* Order summary */}
-              <div className="px-6 py-4 border-b border-brand-border">
+              <div className="px-6 py-4 border-b border-brand-border bg-brand-surface/30">
                 <div className="flex items-start gap-3">
                   <div className="w-10 h-10 bg-brand-yellow/10 rounded-xl flex items-center justify-center flex-shrink-0">
                     <Bus size={18} className="text-brand-yellow" />
@@ -131,90 +131,61 @@ export default function PaymentModal({ data, onClose }: PaymentModalProps) {
                       {fromStop?.name} → {toStop?.name}
                     </div>
                     <div className="text-brand-muted text-sm mt-0.5">
-                      {data.date.toLocaleDateString('uk-UA', { day: 'numeric', month: 'long' })} · {data.departureTime} · {data.seats} {data.seats === 1 ? 'місце' : 'місця'}
-                    </div>
-                    <div className="text-brand-muted text-sm">
-                      {data.name}
+                      {data.date.toLocaleDateString('uk-UA', { day: 'numeric', month: 'long' })} · {data.departureTime}
                     </div>
                   </div>
-                  <div className="text-brand-yellow font-display font-bold text-xl">
-                    {data.price} грн
+                  <div className="text-right">
+                    <div className="text-brand-yellow font-display font-bold text-xl">
+                      {data.price} грн
+                    </div>
+                    <div className="text-[10px] text-brand-muted uppercase">До сплати</div>
                   </div>
                 </div>
               </div>
 
-              {/* Payment methods */}
-              <div className="px-6 py-5 space-y-3">
-                <p className="text-brand-muted text-xs uppercase tracking-wide font-medium mb-4">
-                  Оберіть спосіб оплати
-                </p>
+              <div className="px-6 py-5 space-y-4">
+                {/* Agreement Checkbox */}
+                <button 
+                  onClick={() => setAgreed(!agreed)}
+                  className="flex items-start gap-3 text-left group"
+                >
+                  <div className={`mt-0.5 w-5 h-5 rounded border flex-shrink-0 flex items-center justify-center transition-all ${agreed ? 'bg-brand-yellow border-brand-yellow' : 'border-brand-border bg-brand-surface group-hover:border-brand-yellow/50'}`}>
+                    {agreed && <CheckCircle2 size={14} className="text-brand-dark" />}
+                  </div>
+                  <span className="text-xs text-brand-muted leading-tight">
+                    Я погоджуюся з <span className="text-brand-light underline">умовами договору оферти</span> та <span className="text-brand-light underline">політикою конфіденційності</span>. Я підтверджую, що мені виповнилося 18 років.
+                  </span>
+                </button>
 
-                <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-4 mb-2">
-                  <p className="text-red-400 text-sm font-medium text-center">
-                    ⚠️ Онлайн-оплата тимчасово недоступна з технічних причин. 
-                    Будь ласка, зверніться до диспетчера для бронювання.
-                  </p>
+                <div className="space-y-3">
+                  {/* Balance payment */}
+                  {user && (user.balance || 0) >= data.price && (
+                    <button
+                      onClick={() => handlePay('balance')}
+                      className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl bg-green-500/10 border border-green-500/30 text-green-400 font-bold text-base hover:bg-green-500/20 transition-all"
+                    >
+                      💚 Оплатити з балансу ({user.balance} грн)
+                    </button>
+                  )}
+
+                  {/* Card payment */}
+                  <button
+                    onClick={() => handlePay('card')}
+                    disabled={!agreed}
+                    className={`w-full flex items-center justify-center gap-3 py-4 rounded-2xl font-bold text-base transition-all shadow-brand ${agreed ? 'bg-brand-yellow text-brand-dark hover:scale-[1.02] active:scale-[0.98]' : 'bg-brand-yellow/20 text-brand-dark/30 cursor-not-allowed shadow-none'}`}
+                  >
+                    💳 Оплатити карткою · {data.price} грн
+                  </button>
+
+                  <div className="flex items-center justify-center gap-4 py-2 opacity-50">
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/d/d6/Visa_2021.svg" alt="Visa" className="h-4" />
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/2/2a/Mastercard-logo.svg" alt="Mastercard" className="h-4" />
+                    <img src="https://www.portmone.com.ua/r3/images/logo.svg" alt="Portmone" className="h-4" />
+                  </div>
                 </div>
 
-                {/* Balance payment */}
-                {user && (user.balance || 0) >= data.price && (
-                  <button
-                    disabled
-                    className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl bg-green-500/10 border border-green-500/30 text-green-400/50 font-bold text-base cursor-not-allowed"
-                  >
-                    💚 Оплатити з балансу ({user.balance} грн)
-                  </button>
-                )}
-
-                {/* Apple Pay */}
-                <button
-                  disabled
-                  className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl bg-white/50 text-black/50 font-semibold text-base cursor-not-allowed shadow-md"
-                >
-                  <svg viewBox="0 0 24 24" className="w-6 h-6" fill="currentColor">
-                    <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
-                  </svg>
-                  Apple Pay
-                </button>
-
-                {/* Google Pay */}
-                <button
-                  disabled
-                  className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl bg-brand-surface/50 border border-brand-border text-white/50 font-semibold text-base cursor-not-allowed"
-                >
-                  <svg viewBox="0 0 24 24" className="w-6 h-6">
-                    <path d="M12 24c6.627 0 12-5.373 12-12S18.627 0 12 0 0 5.373 0 12s5.373 12 12 12z" fill="#fff"/>
-                    <path d="M12 24c6.627 0 12-5.373 12-12S18.627 0 12 0 0 5.373 0 12s5.373 12 12 12z" fill="url(#a)"/>
-                    <path d="m11.21 12 3.4-3.37L6.55 12l3.91 3.7 3.56-3.7" fill="#4285F4"/>
-                    <text x="12" y="15.5" textAnchor="middle" fontSize="5" fontFamily="Arial" fontWeight="bold" fill="#4285F4">G</text>
-                    <defs>
-                      <linearGradient id="a" x1="0" y1="0" x2="24" y2="24">
-                        <stop offset="0%" stopColor="#fff" stopOpacity="0"/>
-                        <stop offset="100%" stopColor="#fff" stopOpacity="0"/>
-                      </linearGradient>
-                    </defs>
-                  </svg>
-                  <div className="flex items-center">
-                    <span style={{color:'#4285F4', fontWeight:700}}>G</span>
-                    <span style={{color:'#EA4335', fontWeight:700}}>o</span>
-                    <span style={{color:'#FBBC05', fontWeight:700}}>o</span>
-                    <span style={{color:'#4285F4', fontWeight:700}}>g</span>
-                    <span style={{color:'#34A853', fontWeight:700}}>l</span>
-                    <span style={{color:'#EA4335', fontWeight:700}}>e</span>
-                    <span className="text-white ml-1">Pay</span>
-                  </div>
-                </button>
-
-                {/* Card payment */}
-                <button
-                  disabled
-                  className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl bg-brand-yellow/50 text-brand-dark/50 font-bold text-base cursor-not-allowed shadow-brand"
-                >
-                  💳 Оплатити карткою · {data.price} грн
-                </button>
-
-                <p className="text-center text-brand-muted text-xs mt-2">
-                  🔒 Захищено 256-bit SSL шифруванням
+                <p className="text-center text-brand-muted text-[10px] uppercase tracking-wider">
+                  🔒 Безпека платежів гарантована Portmone.com
                 </p>
               </div>
             </motion.div>
@@ -244,7 +215,7 @@ export default function PaymentModal({ data, onClose }: PaymentModalProps) {
                     className="w-16 h-16 border-4 border-brand-yellow/30 border-t-brand-yellow rounded-full mb-6"
                   />
                   <h3 className="text-white font-display font-bold text-xl mb-2">Оформлення квитка</h3>
-                  <p className="text-brand-muted text-sm text-center">Бронюємо місце. Зачекайте кілька секунд...</p>
+                  <p className="text-brand-muted text-sm text-center">Перенаправлення на сторінку оплати...</p>
                 </>
               )}
             </motion.div>
