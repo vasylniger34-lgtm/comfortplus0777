@@ -191,7 +191,7 @@ export default function Hero({ onBookNow }: HeroProps) {
           transition={{ delay: 0.8 }}
           className="flex flex-col items-center gap-4 mt-12"
         >
-          <p className="text-brand-light font-bold text-base md:text-lg mb-2">Бронюйте онлайн або за номерами телефонів:</p>
+          <p className="text-brand-light font-bold text-base md:text-lg mb-2">Бронюйте за номерами телефонів:</p>
           <div className="flex flex-col md:flex-row justify-center gap-8 md:gap-16">
             <a href={`tel:${CONTACTS.phone1}`} className="hover:text-brand-yellow transition-all flex items-center gap-4 group scale-105 md:scale-110">
               <div className="w-10 h-10 bg-brand-yellow rounded-full flex items-center justify-center group-hover:bg-brand-yellow/80 shadow-brand group-hover:scale-110 transition-all">
