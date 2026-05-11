@@ -421,315 +421,36 @@ export default function BookingForm({ onPay }: BookingFormProps) {
              </button>
           </motion.div>
         ) : (
-          <form onSubmit={handleSubmit} className="card p-6 md:p-8 space-y-4 relative overflow-hidden">
-            {isSubmitting && (
-              <div className="absolute inset-0 z-50 bg-brand-dark/60 backdrop-blur-sm flex flex-col items-center justify-center space-y-4">
-                  <div className="relative">
-                    <Loader2 size={48} className="text-brand-yellow animate-spin" />
-                    <SprinterTaxiIcon className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-brand-yellow scale-50" />
-                  </div>
-                  <p className="text-brand-yellow font-bold animate-pulse text-center px-4">Записуємо ваше місце в таблицю...</p>
-              </div>
-            )}
-
-            {/* STEP 1: DIRECTION */}
-            <div>
-              <h3 className="section-title text-2xl mb-6 flex items-center gap-3">
-                <span className="w-8 h-8 rounded-full bg-brand-yellow text-brand-dark flex items-center justify-center text-sm font-black">1</span>
-                Оберіть напрямок
-              </h3>
-              <div className="grid sm:grid-cols-2 gap-4">
-                {[
-                  { id: 0, label: 'Львів → Східниця', desc: 'Через Стебник, Трускавець, Борислав' },
-                  { id: 1, label: 'Східниця → Львів', desc: 'Через Борислав, Трускавець, Стебник' }
-                ].map((dir) => (
-                  <button
-                    key={dir.id}
-                    type="button"
-                    onClick={() => { setDirectionIndex(dir.id); setFrom(''); setTo(''); setErrors({}); }}
-                    className={`p-6 rounded-2xl border-2 transition-all text-left group
-                      ${directionIndex === dir.id ? 'border-brand-yellow bg-brand-yellow/5' : 'border-brand-border hover:border-brand-yellow/40'}
-                    `}
-                  >
-                    <div className="flex justify-between items-center mb-2">
-                        <span className={`font-display font-black text-xl ${directionIndex === dir.id ? 'text-brand-yellow' : 'text-white'}`}>{dir.label}</span>
-                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${directionIndex === dir.id ? 'border-brand-yellow' : 'border-brand-border'}`}>
-                          {directionIndex === dir.id && <div className="w-2.5 h-2.5 rounded-full bg-brand-yellow" />}
-                        </div>
-                    </div>
-                    <p className="text-sm text-brand-muted">{dir.desc}</p>
-                  </button>
-                ))}
-              </div>
+          <div className="card p-8 md:p-12 text-center space-y-8 border-brand-yellow/30 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-brand-yellow to-transparent opacity-50"></div>
+            
+            <div className="w-24 h-24 bg-brand-yellow/10 rounded-full flex items-center justify-center mx-auto text-brand-yellow shadow-lg shadow-brand-yellow/5">
+               <AlertCircle size={56} />
             </div>
-
-            {/* STEP 2: STOPS */}
-            <AnimatePresence>
-              {directionIndex !== null && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="overflow-hidden"
-                >
-                  <h3 className="section-title text-2xl mb-8 flex items-center gap-3 pt-4 border-t border-brand-border">
-                    <span className="w-8 h-8 rounded-full bg-brand-yellow text-brand-dark flex items-center justify-center text-sm font-black">2</span>
-                    {!from ? 'Оберіть місто відправлення' : 'Тепер оберіть місто прибуття'}
-                  </h3>
-                  
-                  <div className="relative">
-                    <div className="absolute left-4 right-4 h-1 bg-brand-border top-5 -z-10" />
-                    
-                    <div className="flex justify-between items-start">
-                      {currentRoute.map((stop, idx) => {
-                        const isFrom = from === stop.id;
-                        const isTo = to === stop.id;
-                        const isIntermediate = from && to && 
-                            currentRoute.findIndex(s => s.id === from) < idx && 
-                            currentRoute.findIndex(s => s.id === to) > idx;
-
-                        return (
-                          <div key={stop.id} className="flex flex-col items-center group w-full">
-                            <button
-                              type="button"
-                              onClick={() => { handleStopSelect(stop.id); setErrors({}); }}
-                              className={`relative w-10 h-10 rounded-full border-4 flex items-center justify-center transition-all duration-300
-                                  ${isFrom || isTo ? 'bg-brand-yellow border-brand-yellow scale-125 shadow-brand' : 'bg-brand-dark border-brand-border group-hover:border-brand-yellow/50'}
-                                  ${isIntermediate ? 'border-brand-yellow/60' : ''}
-                              `}
-                            >
-                              {isFrom && <span className="text-brand-dark text-[10px] font-black italic">ЗВІДКИ</span>}
-                              {isTo && <span className="text-brand-dark text-[10px] font-black italic">КУДИ</span>}
-                              {!isFrom && !isTo && <div className={`w-2 h-2 rounded-full ${isIntermediate ? 'bg-brand-yellow' : 'bg-brand-border'}`} />}
-                            </button>
-                            <span className={`mt-4 text-[11px] font-bold text-center max-w-[80px] transition-colors ${isFrom || isTo ? 'text-brand-yellow' : 'text-brand-muted hover:text-white'}`}>
-                              {stop.name}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {!from && <div className="mt-4 text-center text-sm text-brand-yellow animate-pulse uppercase font-black tracking-widest bg-brand-yellow/5 py-3 rounded-lg border border-brand-yellow/10">Оберіть точку відправлення</div>}
-                    {from && !to && <div className="mt-4 text-center text-sm text-brand-yellow animate-pulse uppercase font-black tracking-widest bg-brand-yellow/5 py-3 rounded-lg border border-brand-yellow/10">Тепер оберіть точку прибуття</div>}
-                    {from && to && (
-                        <div className="mt-2 bg-brand-yellow/5 p-3 rounded-xl border border-brand-yellow/10 flex items-center justify-center gap-4">
-                          <div className="flex items-center gap-3">
-                            <span className="text-white font-bold">{currentRoute.find(s=>s.id===from)?.name}</span>
-                            <ArrowRight size={16} className="text-brand-yellow" />
-                            <span className="text-white font-bold">{currentRoute.find(s=>s.id===to)?.name}</span>
-                          </div>
-                          <button type="button" onClick={()=>{setFrom('');setTo('');setSelectedTime('');setErrors({});}} className="text-[10px] text-brand-muted hover:text-white underline">Зкинути</button>
-                        </div>
-                    )}
-
-                    {(isForbidden || errors.route) && (
-                      <div className="mt-4 bg-red-500/10 border border-red-500/20 p-4 rounded-xl text-red-500 text-sm flex items-center gap-3 justify-center">
-                        <AlertCircle size={18} />
-                        <span>{errors.route || "Даний маршрут недоступний для бронювання."}</span>
-                      </div>
-                    )}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* STEP 3: DATE & AVAILABILITY */}
-            {from && to && !isForbidden && (
-              <div className="space-y-4 pt-2 border-t border-brand-border">
-                <div className="grid md:grid-cols-2 gap-8">
-                    <div>
-                      <h3 className="section-title text-xl mb-4 flex items-center gap-3">
-                        <span className="w-6 h-6 rounded-full bg-brand-yellow text-brand-dark flex items-center justify-center text-[10px] font-black">3</span>
-                        Дата
-                      </h3>
-                      <DatePicker value={date} onChange={d => { setDate(d); setErrors(e => ({ ...e, date: '' })); setSelectedTime(''); }} />
-                      {errors.date && <p className="text-red-400 text-xs mt-1">{errors.date}</p>}
-                    </div>
-                </div>
-
-                <div>
-                  <h3 className="label mb-4 flex items-center justify-between">
-                    <span>Доступність екіпажів</span>
-                    {date && <span className="text-[10px] text-green-500 uppercase tracking-widest animate-pulse">Live Оновлення</span>}
-                  </h3>
-                  {!date ? (
-                    <div className="card-inner p-10 border border-dashed border-brand-border rounded-2xl text-center text-brand-muted">Оберіть дату поїздки</div>
-                  ) : isLoadingAvailability ? (
-                    <div className="flex flex-col items-center justify-center p-12 space-y-4">
-                       <Loader2 size={32} className="text-brand-yellow animate-spin" />
-                       <span className="text-brand-muted text-sm">Оновлюємо наявні місця...</span>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <AnimatePresence mode="popLayout">
-                        {availableDepartures.map(({ time }) => (
-                          <AvailabilityCard key={time} time={time} isVisible={showAllCrews} />
-                        ))}
-                      </AnimatePresence>
-                      {selectedTime && !showAllCrews && (
-                        <motion.button
-                          type="button"
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          transition={{ delay: 0.3 }}
-                          onClick={() => setShowAllCrews(true)}
-                          className="w-full py-3 text-sm text-brand-muted hover:text-brand-yellow flex items-center justify-center gap-2 rounded-xl border border-dashed border-brand-border hover:border-brand-yellow/30 transition-all"
-                        >
-                          <ChevronDown size={16} />
-                          Показати інші екіпажі
-                        </motion.button>
-                      )}
-                    </div>
-                  )}
-                  {errors.time && <p className="text-red-400 text-xs mt-2">{errors.time}</p>}
-                </div>
-
-                {/* PICKUP LOCATION (Only visible when time is selected) */}
-                {selectedTime && PICKUP_LOCATIONS[from] && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10, height: 0 }}
-                    animate={{ opacity: 1, y: 0, height: 'auto' }}
-                    className="pt-4 overflow-visible"
-                  >
-                    <div className="bg-brand-surface/40 border border-brand-border rounded-2xl p-5">
-                      <div className="flex items-center gap-3 mb-4">
-                        <div className="w-8 h-8 rounded-full bg-brand-yellow/10 flex items-center justify-center">
-                          <MapPin size={16} className="text-brand-yellow" />
-                        </div>
-                        <div>
-                          <h4 className="text-white font-medium text-sm">Зупинка посадки ({currentRoute.find(s=>s.id===from)?.name})</h4>
-                          <p className="text-brand-muted text-xs">Оберіть найзручнішу для вас локацію</p>
-                        </div>
-                      </div>
-                      
-                      <div className="relative">
-                        <button 
-                          type="button" 
-                          onClick={() => setIsPickupDropdownOpen(!isPickupDropdownOpen)}
-                          className={`w-full text-left bg-brand-dark/80 border ${errors.pickupLocation ? 'border-red-500' : 'border-brand-border'} rounded-xl p-4 flex items-center justify-between hover:border-brand-yellow/50 transition-all`}
-                        >
-                          <div className="flex flex-col">
-                            <span className="text-brand-muted text-[10px] uppercase font-bold tracking-wider mb-1">Ваша зупинка</span>
-                            <span className={`text-sm font-medium ${pickupLocation ? 'text-white' : 'text-brand-muted'}`}>
-                              {pickupLocation || "Натисніть, щоб обрати..."}
-                            </span>
-                          </div>
-                          <ChevronDown size={18} className={`text-brand-yellow transition-transform ${isPickupDropdownOpen ? 'rotate-180' : ''}`} />
-                        </button>
-
-                        <AnimatePresence>
-                          {isPickupDropdownOpen && (
-                            <motion.div
-                              initial={{ opacity: 0, y: -10 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0, y: -10 }}
-                              className="absolute top-full left-0 right-0 z-20 mt-2 bg-[#2A2A2A] border border-brand-border rounded-xl shadow-xl overflow-hidden"
-                            >
-                              <div className="max-h-60 overflow-y-auto w-full py-2 custom-scrollbar">
-                                {PICKUP_LOCATIONS[from].map(loc => (
-                                  <button
-                                     key={loc.name}
-                                     type="button"
-                                     onClick={() => { setPickupLocation(loc.name); setIsPickupDropdownOpen(false); setErrors(e => ({ ...e, pickupLocation: '' })); }}
-                                     className={`w-full text-left px-5 py-3 text-sm flex items-center justify-between transition-colors ${pickupLocation === loc.name ? 'text-brand-yellow bg-brand-yellow/10' : 'text-white hover:bg-brand-surface'}`}
-                                  >
-                                     {loc.name}
-                                     {pickupLocation === loc.name && <CheckCircle2 size={16} />}
-                                  </button>
-                                ))}
-                              </div>
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                      </div>
-
-                      {errors.pickupLocation && <p className="text-red-400 text-xs mt-2">{errors.pickupLocation}</p>}
-
-                      {/* Map Button (visible if something is selected) */}
-                      <AnimatePresence>
-                        {pickupLocation && (
-                          <motion.div
-                            initial={{ opacity: 0, height: 0, marginTop: 0 }}
-                            animate={{ opacity: 1, height: 'auto', marginTop: 12 }}
-                            exit={{ opacity: 0, height: 0, marginTop: 0 }}
-                          >
-                            <a 
-                              href={PICKUP_LOCATIONS[from].find(l => l.name === pickupLocation)?.link} 
-                              target="_blank" rel="noreferrer"
-                              className="inline-flex items-center gap-2 px-4 py-2 bg-brand-surface border border-brand-border hover:border-brand-yellow/50 rounded-lg text-xs font-medium text-brand-light hover:text-white transition-all group w-max"
-                            >
-                              <div className="w-6 h-6 rounded-md bg-blue-500/10 flex items-center justify-center group-hover:scale-105 transition-transform">
-                                <Map size={14} className="text-blue-400" />
-                              </div>
-                              Відкрити на Google Картах
-                            </a>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-                  </motion.div>
-                )}
-
-                {/* PASSENGER INFO + SEATS */}
-                <div className="pt-8 border-t border-brand-border">
-                    <h3 className="section-title text-xl mb-6">Дані пасажира та Місця</h3>
-                    <div className="grid lg:grid-cols-3 gap-6">
-                        <div className="lg:col-span-1">
-                            <div className="label mb-2">Ваше ім'я</div>
-                            <div className="relative">
-                              <User size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-yellow" />
-                              <input type="text" value={name} onChange={e => { setName(e.target.value); setErrors(err => ({ ...err, name: '' })); }} placeholder="Іван Іваненко" className="input-field pl-12 h-14" />
-                            </div>
-                            {errors.name && <p className="text-red-400 text-xs mt-1">{errors.name}</p>}
-                        </div>
-                        <div className="lg:col-span-1">
-                            <div className="label mb-2">Телефон</div>
-                            <div className="relative">
-                              <Phone size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-yellow" />
-                              <input type="tel" value={phone} onChange={e => { setPhone(formatPhone(e.target.value)); setErrors(err => ({ ...err, phone: '' })); }} placeholder="+380" className="input-field pl-12 h-14" />
-                            </div>
-                            {errors.phone && <p className="text-red-400 text-xs mt-1">{errors.phone}</p>}
-                        </div>
-                        <div className="lg:col-span-1">
-                            <div className="label mb-2">Кількість місць</div>
-                            <div className="flex gap-2">
-                              {[1, 2, 3, 4].map(n => (
-                                <button
-                                  key={n}
-                                  type="button"
-                                  onClick={() => setSeats(n)}
-                                  className={`flex-1 h-14 rounded-xl text-sm font-bold transition-all ${seats === n ? 'bg-brand-yellow text-brand-dark shadow-brand' : 'bg-brand-surface border border-brand-border text-brand-muted hover:border-brand-yellow/50'}`}
-                                >
-                                  {n}
-                                </button>
-                              ))}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {submitStatus === 'error' && (
-                  <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-xl text-red-500 text-sm text-center">
-                     {statusMessage}
-                  </div>
-                )}
-
-                {price > 0 && selectedTime && (
-                  <div className="bg-brand-dark/40 rounded-2xl p-6 border border-brand-yellow/20 flex flex-col md:flex-row justify-between items-center gap-6">
-                    <div>
-                      <div className="text-brand-muted text-xs uppercase tracking-widest font-black mb-1">Разом за {seats} пас.</div>
-                      <div className="text-brand-yellow text-4xl font-display font-black leading-none">{price * seats} грн</div>
-                    </div>
-                    <button type="submit" disabled={isSubmitting} className="btn-primary w-full md:w-auto px-12 py-5 text-lg flex items-center justify-center gap-3 group disabled:opacity-50 text-dark font-black">
-                      {isSubmitting ? 'Записуємо...' : 'Забронювати'}
-                      {!isSubmitting && <ChevronRight size={20} className="group-hover:translate-x-1 transition-transform" />}
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-          </form>
+            
+            <div className="space-y-4">
+              <h2 className="text-3xl md:text-4xl font-display font-black text-white">Онлайн-бронювання тимчасово недоступне</h2>
+              <p className="text-brand-muted max-w-lg mx-auto text-lg leading-relaxed">
+                Ми наразі налаштовуємо платіжну систему для вашої зручності. 
+                <span className="block mt-2 text-brand-yellow font-bold">Будь ласка, забронюйте поїздку за телефоном:</span>
+              </p>
+            </div>
+            
+            <div className="grid sm:grid-cols-2 gap-4 max-w-2xl mx-auto">
+              <a href={`tel:${CONTACTS.phone1}`} className="btn-primary p-5 flex items-center justify-center gap-3 text-dark font-black text-xl hover:scale-[1.02] transition-transform shadow-brand">
+                <Phone size={24} />
+                {CONTACTS.phone1Display}
+              </a>
+              <a href={`tel:${CONTACTS.phone2}`} className="btn-primary p-5 flex items-center justify-center gap-3 text-dark font-black text-xl hover:scale-[1.02] transition-transform shadow-brand">
+                <Phone size={24} />
+                {CONTACTS.phone2Display}
+              </a>
+            </div>
+            
+            <div className="pt-6 border-t border-brand-border/50">
+              <p className="text-brand-muted text-sm uppercase tracking-widest font-bold">Дякуємо за розуміння!</p>
+            </div>
+          </div>
         )}
       </motion.div>
     </section>
