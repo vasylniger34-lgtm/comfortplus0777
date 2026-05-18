@@ -117,7 +117,7 @@ export const PublicOffer = () => (
       <p><strong>Директор:</strong> {LEGAL_INFO.director}</p>
       <p><strong>Статус:</strong> {LEGAL_INFO.taxGroup}</p>
       <p><strong>Email:</strong> {LEGAL_INFO.email}</p>
-      <p><strong>Телефон:</strong> {CONTACTS.phone1}</p>
+      <p><strong>Телефон:</strong> 067 770 00 90</p>
     </section>
   </div>
 );
