@@ -71,10 +71,10 @@ export function getDuration(fromId: string, toId: string): string {
 }
 
 export const CONTACTS = {
-  phone1: '+380677700090',
-  phone1Display: '067 770 00 90',
-  phone2: '+380980011900', // Keeping existing or should I remove? User only gave one.
-  phone2Display: '098 00 119 00',
+  phone1: '+380980011900',
+  phone1Display: '098 001 19 00',
+  phone2: '+380970011900',
+  phone2Display: '097 001 19 00',
   instagram: 'https://instagram.com/comfortplus0777',
   instagramHandle: '@comfortplus0777',
   email: 'komfortplyus0777@gmail.com',
