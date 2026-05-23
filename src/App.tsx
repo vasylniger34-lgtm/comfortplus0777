@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import AdminPage from './pages/AdminPage';
 import { AnimatePresence } from 'framer-motion';
 
 import Header from './components/layout/Header';
@@ -56,6 +57,8 @@ function MainApp() {
   });
   
   const { user } = useAuth();
+  const location = useLocation();
+  const isAdmin = location.pathname === '/admin';
 
   const scrollToBooking = () => {
     const bookingElement = document.getElementById('booking');
@@ -72,19 +75,22 @@ function MainApp() {
 
   return (
     <div className="min-h-screen bg-brand-dark">
-      <Header 
-        onBookNow={scrollToBooking} 
-        onOpenCabinet={() => user ? setIsCabinetOpen(true) : setIsAuthOpen(true)}
-      />
+      {!isAdmin && (
+        <Header 
+          onBookNow={scrollToBooking} 
+          onOpenCabinet={() => user ? setIsCabinetOpen(true) : setIsAuthOpen(true)}
+        />
+      )}
       
       <Routes>
         <Route path="/" element={<HomePage scrollToBooking={scrollToBooking} setPaymentData={setPaymentData} />} />
         <Route path="/oferta" element={<LegalPage content={PublicOffer} title="Договір оферти" />} />
         <Route path="/konfidenciinist" element={<LegalPage content={PrivacyPolicy} title="Політика конфіденційності" />} />
         <Route path="/povernenya" element={<LegalPage content={RefundPolicy} title="Повернення та оплата" />} />
+        <Route path="/admin" element={<AdminPage />} />
       </Routes>
 
-      <Footer onOpenLegal={openLegal} />
+      {!isAdmin && <Footer onOpenLegal={openLegal} />}
 
       <ChatWidget />
 
@@ -93,6 +99,7 @@ function MainApp() {
           <PaymentModal
             data={paymentData}
             onClose={() => setPaymentData(null)}
+            onOpenLegal={openLegal}
           />
         )}
         {isAuthOpen && <AuthModal onClose={() => setIsAuthOpen(false)} />}

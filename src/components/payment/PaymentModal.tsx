@@ -9,11 +9,12 @@ import { useAuth } from '../../context/AuthContext';
 interface PaymentModalProps {
   data: BookingData;
   onClose: () => void;
+  onOpenLegal?: (type: 'privacy' | 'terms' | 'refund') => void;
 }
 
 type PayStep = 'choose' | 'processing' | 'success';
 
-export default function PaymentModal({ data, onClose }: PaymentModalProps) {
+export default function PaymentModal({ data, onClose, onOpenLegal }: PaymentModalProps) {
   const [step, setStep] = useState<PayStep>('choose');
   const [, setMethod] = useState<'applepay' | 'googlepay' | 'card' | 'balance' | null>(null);
   const [agreed, setAgreed] = useState(false);
@@ -153,7 +154,27 @@ export default function PaymentModal({ data, onClose }: PaymentModalProps) {
                     {agreed && <CheckCircle2 size={14} className="text-brand-dark" />}
                   </div>
                   <span className="text-xs text-brand-muted leading-tight">
-                    Я погоджуюся з <span className="text-brand-light underline">умовами договору оферти</span> та <span className="text-brand-light underline">політикою конфіденційності</span>. Я підтверджую, що мені виповнилося 18 років.
+                    Я погоджуюся з{' '}
+                    <span 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenLegal?.('terms');
+                      }}
+                      className="text-brand-light underline hover:text-brand-yellow cursor-pointer transition-colors"
+                    >
+                      умовами договору оферти
+                    </span>{' '}
+                    та{' '}
+                    <span 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenLegal?.('privacy');
+                      }}
+                      className="text-brand-light underline hover:text-brand-yellow cursor-pointer transition-colors"
+                    >
+                      політикою конфіденційності
+                    </span>
+                    . Я підтверджую, що мені виповнилося 18 років.
                   </span>
                 </button>
 
