@@ -155,38 +155,36 @@ const getCrewByTime = (time: string, fromCity: string, toCity: string) => {
   }
 };
 
-// Хелпери для дат
-const getUADateString = (dateObj: Date) => {
-  const d = String(dateObj.getDate()).padStart(2, '0');
-  const m = String(dateObj.getMonth() + 1).padStart(2, '0');
-  const y = dateObj.getFullYear();
-  return `${d}.${m}.${y}`;
-};
+interface DispatcherPanelProps {
+  onLogout?: () => void;
+  role?: 'dispatcher' | 'junior_dispatcher' | null;
+  adminName?: string;
+}
 
-const formatDateToUA = (isoDate: string) => {
-  if (!isoDate) return '';
-  const [y, m, d] = isoDate.split('-');
-  return `${d}.${m}.${y}`;
-};
-
-const formatDateToISO = (uaDate: string) => {
-  if (!uaDate) return '';
-  const [d, m, y] = uaDate.split('.');
-  return `${y}-${m}-${d}`;
-};
-
-const getTodayISO = () => new Date().toISOString().split('T')[0];
-
-export default function DispatcherPanel({ onLogout }: { onLogout?: () => void }) {
+export default function DispatcherPanel({ onLogout, role, adminName }: DispatcherPanelProps) {
   const [bookings, setBookings] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedDateUA, setSelectedDateUA] = useState(getUADateString(new Date()));
-  const [activeTab, setActiveTab] = useState('06:20');
+  const [activeTab, setActiveTab] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingBooking, setEditingBooking] = useState<any>(null);
   const [visibleDaysCount, setVisibleDaysCount] = useState(7);
   const [assignments, setAssignments] = useState<any[]>([]);
   const [drivers, setDrivers] = useState<any[]>([]);
+
+  // Розклади рейсів
+  const [schedules, setSchedules] = useState<any[]>([]);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [editingSchedule, setEditingSchedule] = useState<any>(null);
+  const [scheduleForm, setScheduleForm] = useState({
+    crew_name: 'Екіпаж 1',
+    driver_id: '',
+    car: '',
+    run1_time: '06:20',
+    run2_time: '09:00',
+    run3_time: '12:00',
+    run4_time: '14:50'
+  });
 
   const getDaysArray = () => {
     const days = [];
@@ -225,7 +223,7 @@ export default function DispatcherPanel({ onLogout }: { onLogout?: () => void })
     departure_time: '09:00',
     seats: 1,
     price: 350,
-    crew: '06:20',
+    crew: 'Екіпаж 1',
     status: 'active'
   });
 
@@ -279,18 +277,25 @@ export default function DispatcherPanel({ onLogout }: { onLogout?: () => void })
     }));
   };
 
-
-
   const fetchAssignmentsAndDrivers = async () => {
     try {
       const [driversData, assignmentsData] = await Promise.all([
-        apiClient.getDrivers(),
-        apiClient.getAssignments(selectedDateUA)
+        driverService.getDrivers(),
+        driverService.getAssignments(selectedDateUA)
       ]);
       setDrivers(driversData || []);
       setAssignments(assignmentsData || []);
     } catch (e) {
       console.error('Помилка завантаження водіїв/призначень:', e);
+    }
+  };
+
+  const fetchSchedules = async () => {
+    try {
+      const data = await apiClient.getSchedules(selectedDateUA);
+      setSchedules(data || []);
+    } catch (e) {
+      console.error('Помилка завантаження розкладу:', e);
     }
   };
 
@@ -308,25 +313,138 @@ export default function DispatcherPanel({ onLogout }: { onLogout?: () => void })
   useEffect(() => {
     fetchBookings();
     fetchAssignmentsAndDrivers();
+    fetchSchedules();
 
     // Підписка на сокети
     apiClient.socket.on('bookings_changed', fetchBookings);
     apiClient.socket.on('assignments_changed', fetchAssignmentsAndDrivers);
+    apiClient.socket.on('schedules_changed', fetchSchedules);
 
     return () => {
       apiClient.socket.off('bookings_changed', fetchBookings);
       apiClient.socket.off('assignments_changed', fetchAssignmentsAndDrivers);
+      apiClient.socket.off('schedules_changed', fetchSchedules);
     };
   }, [selectedDateUA]);
+
+  useEffect(() => {
+    const crewNames = schedules.map(s => s.crew_name);
+    if (!activeTab || (!crewNames.includes(activeTab) && activeTab !== 'водії' && activeTab !== 'звіт')) {
+      if (crewNames.length > 0) {
+        setActiveTab(crewNames[0]);
+      } else {
+        setActiveTab('водії');
+      }
+    }
+  }, [schedules]);
+
+  const openCreateScheduleModal = () => {
+    setEditingSchedule(null);
+    setScheduleForm({
+      crew_name: 'Екіпаж 1',
+      driver_id: '',
+      car: '',
+      run1_time: '06:20',
+      run2_time: '09:00',
+      run3_time: '12:00',
+      run4_time: '14:50'
+    });
+    setShowScheduleModal(true);
+  };
+
+  const openEditScheduleModal = (schedule: any) => {
+    setEditingSchedule(schedule);
+    setScheduleForm({
+      crew_name: schedule.crew_name,
+      driver_id: schedule.driver_id || '',
+      car: schedule.car || '',
+      run1_time: schedule.run1_time,
+      run2_time: schedule.run2_time,
+      run3_time: schedule.run3_time,
+      run4_time: schedule.run4_time
+    });
+    setShowScheduleModal(true);
+  };
+
+  const handleCrewPresetChange = (name: string) => {
+    const presets: Record<string, string[]> = {
+      'Екіпаж 1': ['06:20', '09:00', '12:00', '14:50'],
+      'Екіпаж 2': ['07:10', '10:15', '13:20', '16:10'],
+      'Екіпаж 3': ['08:15', '11:10', '15:30', '18:20'],
+      'Екіпаж 4': ['09:30', '12:20', '16:20', '19:20'],
+      'Екіпаж 5': ['10:35', '13:10', '17:00', '20:00'],
+      'Екіпаж 6': ['11:10', '14:10', '17:40', '20:40']
+    };
+
+    if (presets[name]) {
+      const [r1, r2, r3, r4] = presets[name];
+      setScheduleForm(prev => ({
+        ...prev,
+        crew_name: name,
+        run1_time: r1,
+        run2_time: r2,
+        run3_time: r3,
+        run4_time: r4
+      }));
+    } else {
+      setScheduleForm(prev => ({
+        ...prev,
+        crew_name: name
+      }));
+    }
+  };
+
+  const handleSaveSchedule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const payload = {
+        date: selectedDateUA,
+        ...scheduleForm
+      };
+      
+      if (editingSchedule) {
+        await apiClient.updateSchedule(editingSchedule.id, payload);
+      } else {
+        await apiClient.createSchedule(payload);
+      }
+      
+      setShowScheduleModal(false);
+      fetchSchedules();
+    } catch (err: any) {
+      alert('Помилка збереження рейсу: ' + err.message);
+    }
+  };
+
+  const handleDeleteSchedule = async (id: string) => {
+    if (window.confirm('Ви впевнені, що хочете видалити цей рейс дня?')) {
+      try {
+        await apiClient.deleteSchedule(id);
+        fetchSchedules();
+      } catch (err: any) {
+        alert('Помилка видалення рейсу: ' + err.message);
+      }
+    }
+  };
+
+  const findCrewByTime = (time: string) => {
+    if (activeTab !== 'водії' && activeTab !== 'звіт') {
+      return activeTab;
+    }
+    const found = schedules.find(s => {
+      return s.run1_time === time || s.run2_time === time || s.run3_time === time || s.run4_time === time;
+    });
+    return found ? found.crew_name : 'Екіпаж';
+  };
 
   const handleAddBooking = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const crew = getCrewByTime(newBooking.departure_time, newBooking.from, newBooking.to);
+    const crew = findCrewByTime(newBooking.departure_time);
     const payload = { 
       ...newBooking, 
       crew,
-      date: formatDateToUA(newBooking.date) // Конвертуємо в ДД.ММ.РРРР для бази
+      date: formatDateToUA(newBooking.date),
+      updated_by: adminName || 'Диспетчер'
     };
 
     try {
@@ -342,7 +460,7 @@ export default function DispatcherPanel({ onLogout }: { onLogout?: () => void })
         departure_time: activeTab === 'звіт' || activeTab === 'водії' ? '06:20' : activeTab,
         seats: 1,
         price: 350,
-        crew: activeTab === 'звіт' || activeTab === 'водії' ? '06:20' : activeTab,
+        crew: activeTab === 'звіт' || activeTab === 'водії' ? 'Екіпаж 1' : activeTab,
         status: 'active'
       });
       fetchBookings();
@@ -354,11 +472,12 @@ export default function DispatcherPanel({ onLogout }: { onLogout?: () => void })
   const handleUpdateBooking = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const crew = getCrewByTime(editingBooking.departure_time, editingBooking.from, editingBooking.to);
+    const crew = findCrewByTime(editingBooking.departure_time);
     const payload = { 
       ...editingBooking, 
       crew,
-      date: editingBooking.date.includes('-') ? formatDateToUA(editingBooking.date) : editingBooking.date
+      date: editingBooking.date.includes('-') ? formatDateToUA(editingBooking.date) : editingBooking.date,
+      updated_by: adminName || 'Диспетчер'
     };
 
     try {
@@ -421,6 +540,12 @@ export default function DispatcherPanel({ onLogout }: { onLogout?: () => void })
     crewBreakdown[crew].passengers += (b.seats || 0);
     crewBreakdown[crew].sum += (b.price || 0);
   });
+
+  const crewTabs = [
+    ...schedules.map(s => s.crew_name),
+    'водії',
+    'звіт'
+  ];
 
   return (
     <div className="min-h-screen bg-brand-dark p-4 md:p-8 flex flex-col">
@@ -507,37 +632,68 @@ export default function DispatcherPanel({ onLogout }: { onLogout?: () => void })
         <div className="flex-1 bg-brand-surface border border-brand-border rounded-2xl overflow-hidden flex flex-col">
           
           {/* Таби зверху (перенесено з низу) */}
-          <div className="bg-brand-dark border-b border-brand-border flex overflow-x-auto no-scrollbar flex-shrink-0">
-            {CREW_TABS.map(tab => (
+          <div className="bg-brand-dark border-b border-brand-border flex overflow-x-auto no-scrollbar flex-shrink-0 items-center justify-between pr-4">
+            <div className="flex overflow-x-auto no-scrollbar">
+              {crewTabs.map(tab => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setActiveTab(tab)}
+                  className={`px-6 py-3 text-sm font-bold transition-all border-r border-brand-border flex-shrink-0
+                    ${activeTab === tab 
+                      ? 'bg-brand-surface text-brand-yellow border-b-2 border-b-brand-yellow' 
+                      : 'text-brand-muted hover:text-white hover:bg-brand-surface/50'
+                    }
+                    ${tab === 'звіт' || tab === 'водії' ? 'bg-brand-yellow/5' : ''}
+                  `}
+                >
+                  {tab === 'звіт' ? '📊 Звіт' : tab === 'водії' ? '👥 Водії' : tab}
+                </button>
+              ))}
+            </div>
+            {role !== 'junior_dispatcher' && (
               <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`px-6 py-3 text-sm font-bold transition-all border-r border-brand-border flex-shrink-0
-                  ${activeTab === tab 
-                    ? 'bg-brand-surface text-brand-yellow border-b-2 border-b-brand-yellow' 
-                    : 'text-brand-muted hover:text-white hover:bg-brand-surface/50'
-                  }
-                  ${tab === 'звіт' || tab === 'водії' ? 'bg-brand-yellow/5' : ''}
-                `}
+                type="button"
+                onClick={openCreateScheduleModal}
+                className="btn-primary py-1.5 px-3 text-xs font-bold flex items-center gap-1.5 rounded-lg text-brand-dark"
               >
-                {tab === 'звіт' ? '📊 Звіт' : tab === 'водії' ? '👥 Водії' : tab}
+                <Plus size={14} />
+                <span>Створити рейс</span>
               </button>
-            ))}
+            )}
           </div>
 
           {/* Інформація про водія та авто під датами (вкладка екіпажу) */}
           {activeTab !== 'водії' && activeTab !== 'звіт' && (() => {
-            const assignmentForCrew = assignments.find(a => a.crew === activeTab);
-            const assignedDriver = drivers.find(d => d.id === assignmentForCrew?.driver_id);
+            const currentSchedule = schedules.find(s => s.crew_name === activeTab);
+            const assignedDriver = drivers.find(d => d.id === currentSchedule?.driver_id);
             const driverName = assignedDriver ? assignedDriver.name : 'Не призначено';
-            const carNumber = assignmentForCrew?.car || 'Не призначено';
+            const carNumber = currentSchedule?.car || 'Не призначено';
 
             return (
               <div className="bg-brand-dark/40 px-6 py-3.5 border-b border-brand-border flex flex-wrap gap-4 items-center justify-between flex-shrink-0">
                 <div className="flex items-center gap-4 flex-wrap">
                   <div className="text-xs uppercase font-bold text-brand-muted tracking-wide">Поточний екіпаж:</div>
-                  <div className="text-sm font-black text-brand-yellow bg-brand-yellow/10 px-3 py-1 rounded border border-brand-yellow/20">
-                    ЕКІПАЖ: {activeTab}
+                  <div className="text-sm font-black text-brand-yellow bg-brand-yellow/10 px-3 py-1 rounded border border-brand-yellow/20 flex items-center gap-2">
+                    <span>ЕКІПАЖ: {activeTab}</span>
+                    {role !== 'junior_dispatcher' && currentSchedule && (
+                      <button 
+                        type="button"
+                        onClick={() => openEditScheduleModal(currentSchedule)}
+                        className="text-[10px] text-brand-muted hover:text-brand-yellow transition-colors underline font-bold"
+                      >
+                        (редагувати)
+                      </button>
+                    )}
+                    {role !== 'junior_dispatcher' && currentSchedule && (
+                      <button 
+                        type="button"
+                        onClick={() => handleDeleteSchedule(currentSchedule.id)}
+                        className="text-[10px] text-red-400 hover:text-red-300 transition-colors underline font-bold ml-1"
+                      >
+                        (видалити)
+                      </button>
+                    )}
                   </div>
                 </div>
                 
@@ -558,7 +714,7 @@ export default function DispatcherPanel({ onLogout }: { onLogout?: () => void })
           {/* Контент */}
           <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 sm:space-y-8">
             {activeTab === 'водії' ? (
-              <DriversSubPanel selectedDateUA={selectedDateUA} />
+              <DriversSubPanel selectedDateUA={selectedDateUA} role={role} />
             ) : activeTab === 'звіт' ? (
               // Вигляд Звіту
               <div className="space-y-6">
@@ -591,17 +747,17 @@ export default function DispatcherPanel({ onLogout }: { onLogout?: () => void })
                       </thead>
                       <tbody className="text-sm text-white divide-y divide-brand-border">
                         {Object.keys(crewBreakdown).map(crew => {
-                          const assignmentForCrew = assignments.find(a => a.crew === crew);
-                          const assignedDriver = drivers.find(d => d.id === assignmentForCrew?.driver_id);
+                          const schedule = schedules.find(s => s.crew_name === crew);
+                          const assignedDriver = drivers.find(d => d.id === schedule?.driver_id);
                           const driverName = assignedDriver ? assignedDriver.name : 'Не призначено';
-                          const carNumber = assignmentForCrew?.car || 'Не призначено';
+                          const carNumber = schedule?.car || 'Не призначено';
 
                           return (
                             <tr key={crew} className="hover:bg-brand-surface/50">
                               <td className="px-4 py-3 font-bold text-brand-yellow">{crew}</td>
                               <td className="px-4 py-3 text-xs">
                                 <div className="font-bold">{driverName}</div>
-                                {assignmentForCrew?.car && <div className="text-brand-muted font-mono mt-0.5 uppercase">{carNumber}</div>}
+                                {schedule?.car && <div className="text-brand-muted font-mono mt-0.5 uppercase">{carNumber}</div>}
                               </td>
                               <td className="px-4 py-3">{crewBreakdown[crew].passengers}</td>
                               <td className="px-4 py-3 text-green-500">{crewBreakdown[crew].sum} грн</td>
@@ -616,14 +772,37 @@ export default function DispatcherPanel({ onLogout }: { onLogout?: () => void })
             ) : (
               // Вигляд Таблиць
               (() => {
-                const runs = CREW_RUNS[activeTab] || [];
-                if (runs.length === 0) {
+                const currentSchedule = schedules.find(s => s.crew_name === activeTab);
+                if (!currentSchedule) {
                   return (
-                    <div className="text-center text-brand-muted py-10">
-                      Немає визначених рейсів для цієї вкладки
+                    <div className="flex flex-col items-center justify-center p-12 text-center border border-dashed border-brand-border rounded-2xl bg-brand-dark/20 m-6">
+                      <div className="w-16 h-16 bg-brand-yellow/10 rounded-full flex items-center justify-center mb-4 text-brand-yellow">
+                        <CalendarIcon size={32} />
+                      </div>
+                      <h3 className="text-xl font-display font-bold text-white mb-2">Рейси на цей день не створено</h3>
+                      <p className="text-brand-muted max-w-sm mb-6 text-sm">
+                        На {selectedDateUA} ще немає створених рейсів. Створіть перший рейс екіпажу, щоб почати приймати бронювання.
+                      </p>
+                      {role !== 'junior_dispatcher' && (
+                        <button 
+                          type="button"
+                          onClick={openCreateScheduleModal}
+                          className="btn-primary py-3 px-6 font-bold flex items-center gap-2"
+                        >
+                          <Plus size={18} />
+                          Створити рейс дня
+                        </button>
+                      )}
                     </div>
                   );
                 }
+
+                const runs = [
+                  { time: currentSchedule.run1_time, from: 'Східниця', to: 'Львів' },
+                  { time: currentSchedule.run2_time, from: 'Львів', to: 'Східниця' },
+                  { time: currentSchedule.run3_time, from: 'Східниця', to: 'Львів' },
+                  { time: currentSchedule.run4_time, from: 'Львів', to: 'Східниця' }
+                ];
 
                 return (
                   <div className="space-y-8">
@@ -743,10 +922,18 @@ export default function DispatcherPanel({ onLogout }: { onLogout?: () => void })
                                             {slot.seatNumber}
                                           </td>
                                           <td className="px-4 py-2.5 font-semibold">
-                                            {b.name} {b.totalSeats > 1 && (
-                                              <span className="text-xs text-brand-muted font-normal ml-1">
-                                                ({slot.seatNumber - slots.findIndex(s => s.booking?.id === b.id)}/{b.totalSeats})
-                                              </span>
+                                            <div>
+                                              <span>{b.name}</span>
+                                              {b.totalSeats > 1 && (
+                                                <span className="text-xs text-brand-muted font-normal ml-1">
+                                                  ({slot.seatNumber - slots.findIndex(s => s.booking?.id === b.id)}/{b.totalSeats})
+                                                </span>
+                                              )}
+                                            </div>
+                                            {b.updated_by && (
+                                              <div className="text-[10px] text-brand-muted font-normal mt-0.5">
+                                                Змінив: {b.updated_by}
+                                              </div>
                                             )}
                                           </td>
                                           <td className="px-4 py-2.5 text-xs text-gray-300">
@@ -763,23 +950,27 @@ export default function DispatcherPanel({ onLogout }: { onLogout?: () => void })
                                               <a href={`tel:${b.phone}`} className="text-green-500 hover:text-green-400 p-1 rounded hover:bg-brand-surface transition-colors" title="Подзвонити">
                                                 <PhoneCall size={14} />
                                               </a>
-                                              <button 
-                                                onClick={() => {
-                                                  const isoDate = formatDateToISO(b.date);
-                                                  setEditingBooking({...b, date: isoDate});
-                                                }}
-                                                className="text-brand-yellow hover:text-brand-gold p-1 rounded hover:bg-brand-surface transition-colors"
-                                                title="Редагувати"
-                                              >
-                                                <Edit2 size={14} />
-                                              </button>
-                                              <button 
-                                                onClick={() => handleDeleteBooking(b.id)}
-                                                className="text-red-500 hover:text-red-400 p-1 rounded hover:bg-brand-surface transition-colors"
-                                                title="Видалити"
-                                              >
-                                                <Trash2 size={14} />
-                                              </button>
+                                              {role !== 'junior_dispatcher' && (
+                                                <>
+                                                  <button 
+                                                    onClick={() => {
+                                                      const isoDate = formatDateToISO(b.date);
+                                                      setEditingBooking({...b, date: isoDate});
+                                                    }}
+                                                    className="text-brand-yellow hover:text-brand-gold p-1 rounded hover:bg-brand-surface transition-colors"
+                                                    title="Редагувати"
+                                                  >
+                                                    <Edit2 size={14} />
+                                                  </button>
+                                                  <button 
+                                                    onClick={() => handleDeleteBooking(b.id)}
+                                                    className="text-red-500 hover:text-red-400 p-1 rounded hover:bg-brand-surface transition-colors"
+                                                    title="Видалити"
+                                                  >
+                                                    <Trash2 size={14} />
+                                                  </button>
+                                                </>
+                                              )}
                                             </div>
                                           </td>
                                         </tr>
@@ -1100,6 +1291,162 @@ export default function DispatcherPanel({ onLogout }: { onLogout?: () => void })
           </div>
         )}
       </AnimatePresence>
+
+      {/* Модалка створення / редагування рейсів дня */}
+      <AnimatePresence>
+        {showScheduleModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-brand-dark/80 backdrop-blur-sm">
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="card max-w-lg w-full p-6 space-y-4 border-brand-yellow/20"
+              >
+                <div className="flex justify-between items-center">
+                  <h3 className="text-xl font-display font-bold text-white">
+                    {editingSchedule ? 'Редагувати рейс екіпажу' : 'Створити рейс екіпажу'}
+                  </h3>
+                  <button onClick={() => setShowScheduleModal(false)} className="text-brand-muted hover:text-white">
+                    <X size={20} />
+                  </button>
+                </div>
+
+                <form onSubmit={handleSaveSchedule} className="space-y-4">
+                  {/* Вибір швидких екіпажів */}
+                  <div>
+                    <label className="label text-xs mb-1 block text-brand-muted">Оберіть шаблон екіпажу</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {['Екіпаж 1', 'Екіпаж 2', 'Екіпаж 3', 'Екіпаж 4', 'Екіпаж 5', 'Екіпаж 6'].map(presetName => (
+                        <button
+                          key={presetName}
+                          type="button"
+                          onClick={() => handleCrewPresetChange(presetName)}
+                          className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all border ${
+                            scheduleForm.crew_name === presetName 
+                              ? 'bg-brand-yellow text-brand-dark border-brand-yellow font-black'
+                              : 'bg-brand-surface border-brand-border text-brand-muted hover:border-brand-yellow/50'
+                          }`}
+                        >
+                          {presetName}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Назва екіпажу */}
+                  <div>
+                    <label className="label text-xs mb-1 block">Назва екіпажу (можна змінити)</label>
+                    <input 
+                      type="text" 
+                      required
+                      value={scheduleForm.crew_name}
+                      onChange={e => setScheduleForm({...scheduleForm, crew_name: e.target.value})}
+                      className="input-field h-11"
+                      placeholder="Наприклад: Екіпаж 1 або Додатковий"
+                    />
+                  </div>
+
+                  {/* Водій та автомобіль */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="label text-xs mb-1 block">Водій</label>
+                      <select
+                        value={scheduleForm.driver_id}
+                        onChange={e => setScheduleForm({...scheduleForm, driver_id: e.target.value})}
+                        className="input-field h-11 bg-brand-dark"
+                      >
+                        <option value="">-- Оберіть водія --</option>
+                        {drivers.map(d => (
+                          <option key={d.id} value={d.id}>{d.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="label text-xs mb-1 block">Машина</label>
+                      <select
+                        value={scheduleForm.car}
+                        onChange={e => setScheduleForm({...scheduleForm, car: e.target.value})}
+                        className="input-field h-11 bg-brand-dark"
+                      >
+                        <option value="">-- Оберіть машину --</option>
+                        {CARS_LIST.map(car => (
+                          <option key={car} value={car}>{car}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Години рейсів */}
+                  <div>
+                    <label className="label text-xs mb-2 block font-bold text-brand-yellow">Час відправлень (4 рейси за день)</label>
+                    <div className="grid grid-cols-2 gap-4 bg-brand-dark/30 p-3 rounded-xl border border-brand-border/40">
+                      <div>
+                        <label className="text-[10px] text-brand-muted uppercase font-bold mb-1 block">Рейс 1: Східниця → Львів</label>
+                        <input 
+                          type="text" 
+                          required
+                          value={scheduleForm.run1_time}
+                          onChange={e => setScheduleForm({...scheduleForm, run1_time: e.target.value})}
+                          className="input-field h-10 text-center font-bold"
+                          placeholder="06:20"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-brand-muted uppercase font-bold mb-1 block">Рейс 2: Львів → Східниця</label>
+                        <input 
+                          type="text" 
+                          required
+                          value={scheduleForm.run2_time}
+                          onChange={e => setScheduleForm({...scheduleForm, run2_time: e.target.value})}
+                          className="input-field h-10 text-center font-bold"
+                          placeholder="09:00"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-brand-muted uppercase font-bold mb-1 block">Рейс 3: Східниця → Львів</label>
+                        <input 
+                          type="text" 
+                          required
+                          value={scheduleForm.run3_time}
+                          onChange={e => setScheduleForm({...scheduleForm, run3_time: e.target.value})}
+                          className="input-field h-10 text-center font-bold"
+                          placeholder="12:00"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-brand-muted uppercase font-bold mb-1 block">Рейс 4: Львів → Східниця</label>
+                        <input 
+                          type="text" 
+                          required
+                          value={scheduleForm.run4_time}
+                          onChange={e => setScheduleForm({...scheduleForm, run4_time: e.target.value})}
+                          className="input-field h-10 text-center font-bold"
+                          placeholder="14:50"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowScheduleModal(false)}
+                      className="btn-secondary flex-1 py-2.5 font-bold"
+                    >
+                      Скасувати
+                    </button>
+                    <button
+                      type="submit"
+                      className="btn-primary flex-1 py-2.5 font-bold text-brand-dark"
+                    >
+                      Зберегти
+                    </button>
+                  </div>
+                </form>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
     </div>
   );
 }
@@ -1107,11 +1454,14 @@ export default function DispatcherPanel({ onLogout }: { onLogout?: () => void })
 // Sub-panel for managing drivers and assignments
 interface DriversSubPanelProps {
   selectedDateUA: string;
+  role?: string;
+  schedules?: any[];
+  fetchSchedules?: () => void;
+  drivers?: any[];
 }
 
-function DriversSubPanel({ selectedDateUA }: DriversSubPanelProps) {
+function DriversSubPanel({ selectedDateUA, role, schedules = [], fetchSchedules, drivers: parentDrivers = [] }: DriversSubPanelProps) {
   const [drivers, setDrivers] = useState<DriverProfile[]>([]);
-  const [assignments, setAssignments] = useState<DriverAssignment[]>([]);
   const [isDriversLoading, setIsDriversLoading] = useState(false);
   
   const [newDriverName, setNewDriverName] = useState('');
@@ -1125,12 +1475,8 @@ function DriversSubPanel({ selectedDateUA }: DriversSubPanelProps) {
   const loadData = async () => {
     setIsDriversLoading(true);
     try {
-      const [driversData, assignmentsData] = await Promise.all([
-        driverService.getDrivers(),
-        driverService.getAssignments(selectedDateUA)
-      ]);
+      const driversData = await driverService.getDrivers();
       setDrivers(driversData);
-      setAssignments(assignmentsData);
     } catch (e) {
       console.error(e);
     } finally {
@@ -1173,9 +1519,9 @@ function DriversSubPanel({ selectedDateUA }: DriversSubPanelProps) {
       setNewDriverPhone('+380');
       setNewDriverPin('');
       await loadData();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      setAddDriverError('Помилка при додаванні водія.');
+      setAddDriverError(err.message || 'Помилка при додаванні водія.');
     } finally {
       setIsAddingDriver(false);
     }
@@ -1201,41 +1547,31 @@ function DriversSubPanel({ selectedDateUA }: DriversSubPanelProps) {
     'вс 1080 хв'
   ];
 
-  const handleAssignChange = async (crew: string, driverId: string) => {
-    setSavingCrews(prev => ({ ...prev, [crew]: true }));
+  const handleAssignChange = async (scheduleId: string, driverId: string) => {
+    setSavingCrews(prev => ({ ...prev, [scheduleId]: true }));
     try {
-      const assignment = assignments.find(a => a.crew === crew);
-      const currentCar = assignment ? (assignment.car || null) : null;
-      
-      await driverService.assignDriver(driverId ? driverId : null, currentCar, crew, selectedDateUA);
-      const updatedAssignments = await driverService.getAssignments(selectedDateUA);
-      setAssignments(updatedAssignments);
+      await apiClient.updateSchedule(scheduleId, { driver_id: driverId ? driverId : null });
+      if (fetchSchedules) fetchSchedules();
     } catch (err) {
       console.error(err);
       alert('Помилка при призначенні водія.');
     } finally {
-      setSavingCrews(prev => ({ ...prev, [crew]: false }));
+      setSavingCrews(prev => ({ ...prev, [scheduleId]: false }));
     }
   };
 
-  const handleCarChange = async (crew: string, car: string) => {
-    setSavingCrews(prev => ({ ...prev, [crew]: true }));
+  const handleCarChange = async (scheduleId: string, car: string) => {
+    setSavingCrews(prev => ({ ...prev, [scheduleId]: true }));
     try {
-      const assignment = assignments.find(a => a.crew === crew);
-      const currentDriverId = assignment ? (assignment.driver_id || null) : null;
-      
-      await driverService.assignDriver(currentDriverId, car ? car : null, crew, selectedDateUA);
-      const updatedAssignments = await driverService.getAssignments(selectedDateUA);
-      setAssignments(updatedAssignments);
+      await apiClient.updateSchedule(scheduleId, { car: car ? car : null });
+      if (fetchSchedules) fetchSchedules();
     } catch (err) {
       console.error(err);
       alert('Помилка при призначенні авто.');
     } finally {
-      setSavingCrews(prev => ({ ...prev, [crew]: false }));
+      setSavingCrews(prev => ({ ...prev, [scheduleId]: false }));
     }
   };
-
-  const ACTIVE_CREWS = ['06:20', '07:10', '08:15', '09:30', '10:35', '11:10'];
 
   return (
     <div className="space-y-8 text-white">
@@ -1257,57 +1593,64 @@ function DriversSubPanel({ selectedDateUA }: DriversSubPanelProps) {
             </div>
           ) : (
             <div className="space-y-3">
-              {ACTIVE_CREWS.map(crew => {
-                const assignment = assignments.find(a => a.crew === crew);
-                const currentDriverId = assignment ? assignment.driver_id : '';
-                const currentCar = assignment ? (assignment.car || '') : '';
-                const isSaving = savingCrews[crew];
+              {schedules.length === 0 ? (
+                <div className="text-center text-brand-muted py-6 text-sm">
+                  Немає створених екіпажів на цю дату. Спершу створіть рейс на вкладці екіпажів.
+                </div>
+              ) : (
+                schedules.map(s => {
+                  const currentDriverId = s.driver_id || '';
+                  const currentCar = s.car || '';
+                  const isSaving = savingCrews[s.id];
 
-                return (
-                  <div key={crew} className="flex justify-between items-center p-3 rounded-lg bg-brand-surface border border-brand-border hover:border-brand-yellow/30 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <div className="text-xl font-display font-black text-brand-yellow w-16">{crew}</div>
-                      <div className="text-xs text-brand-muted uppercase font-bold">Екіпаж</div>
-                    </div>
+                  return (
+                    <div key={s.id} className="flex justify-between items-center p-3 rounded-lg bg-brand-surface border border-brand-border hover:border-brand-yellow/30 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <div className="text-sm font-display font-black text-brand-yellow w-24 truncate">{s.crew_name}</div>
+                        <div className="text-[10px] text-brand-muted uppercase font-bold hidden sm:block">Екіпаж</div>
+                      </div>
 
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 min-w-[200px] sm:min-w-[320px]">
-                      {isSaving ? (
-                        <RefreshCw size={16} className="animate-spin text-brand-yellow mr-2" />
-                      ) : (currentDriverId || currentCar) ? (
-                        <span className="text-green-500 text-xs font-bold mr-1 whitespace-nowrap">✓ Призначено</span>
-                      ) : null}
-                      
-                      <div className="flex gap-2 w-full">
-                        <select
-                          value={currentDriverId}
-                          onChange={(e) => handleAssignChange(crew, e.target.value)}
-                          className="bg-brand-dark border border-brand-border rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-brand-yellow w-1/2"
-                        >
-                          <option value="">-- Водій --</option>
-                          {drivers.map(d => (
-                            <option key={d.id} value={d.id}>
-                              {d.name}
-                            </option>
-                          ))}
-                        </select>
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 min-w-[200px] sm:min-w-[320px]">
+                        {isSaving ? (
+                          <RefreshCw size={16} className="animate-spin text-brand-yellow mr-2" />
+                        ) : (currentDriverId || currentCar) ? (
+                          <span className="text-green-500 text-xs font-bold mr-1 whitespace-nowrap">✓ Призначено</span>
+                        ) : null}
+                        
+                        <div className="flex gap-2 w-full">
+                          <select
+                            value={currentDriverId}
+                            disabled={role === 'junior_dispatcher'}
+                            onChange={(e) => handleAssignChange(s.id, e.target.value)}
+                            className="bg-brand-dark border border-brand-border rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-brand-yellow w-1/2 disabled:opacity-50"
+                          >
+                            <option value="">-- Водій --</option>
+                            {drivers.map(d => (
+                              <option key={d.id} value={d.id}>
+                                {d.name}
+                              </option>
+                            ))}
+                          </select>
 
-                        <select
-                          value={currentCar}
-                          onChange={(e) => handleCarChange(crew, e.target.value)}
-                          className="bg-brand-dark border border-brand-border rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-brand-yellow w-1/2"
-                        >
-                          <option value="">-- Машина --</option>
-                          {CARS_LIST.map(car => (
-                            <option key={car} value={car}>
-                              {car}
-                            </option>
-                          ))}
-                        </select>
+                          <select
+                            value={currentCar}
+                            disabled={role === 'junior_dispatcher'}
+                            onChange={(e) => handleCarChange(s.id, e.target.value)}
+                            className="bg-brand-dark border border-brand-border rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-brand-yellow w-1/2 disabled:opacity-50"
+                          >
+                            <option value="">-- Машина --</option>
+                            {CARS_LIST.map(car => (
+                              <option key={car} value={car}>
+                                {car}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
           )}
         </div>
@@ -1318,49 +1661,51 @@ function DriversSubPanel({ selectedDateUA }: DriversSubPanelProps) {
             <h3 className="font-display font-black text-white text-lg">Список водіїв</h3>
           </div>
 
-          <form onSubmit={handleAddDriver} className="bg-brand-surface p-4 rounded-xl border border-brand-border space-y-3">
-            <div className="text-xs text-brand-muted uppercase font-bold mb-1">Додати водія</div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <input
-                type="text"
-                placeholder="Ім'я водія"
-                value={newDriverName}
-                onChange={e => setNewDriverName(e.target.value)}
-                className="bg-brand-dark border border-brand-border rounded-lg px-3 py-2 text-sm text-white placeholder-brand-muted focus:outline-none focus:border-brand-yellow"
-                required
-              />
-              <input
-                type="tel"
-                placeholder="Телефон"
-                value={newDriverPhone}
-                onChange={e => handlePhoneChange(e.target.value)}
-                className="bg-brand-dark border border-brand-border rounded-lg px-3 py-2 text-sm text-white placeholder-brand-muted focus:outline-none focus:border-brand-yellow"
-                required
-              />
-              <input
-                type="text"
-                placeholder="PIN (4 цифри)"
-                value={newDriverPin}
-                onChange={e => setNewDriverPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                className="bg-brand-dark border border-brand-border rounded-lg px-3 py-2 text-sm text-white text-center font-display tracking-widest placeholder-brand-muted focus:outline-none focus:border-brand-yellow"
-                maxLength={4}
-                required
-              />
-            </div>
-            
-            {addDriverError && (
-              <div className="text-red-500 text-xs">{addDriverError}</div>
-            )}
+          {role !== 'junior_dispatcher' && (
+            <form onSubmit={handleAddDriver} className="bg-brand-surface p-4 rounded-xl border border-brand-border space-y-3">
+              <div className="text-xs text-brand-muted uppercase font-bold mb-1">Додати водія</div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <input
+                  type="text"
+                  placeholder="Ім'я водія"
+                  value={newDriverName}
+                  onChange={e => setNewDriverName(e.target.value)}
+                  className="bg-brand-dark border border-brand-border rounded-lg px-3 py-2 text-sm text-white placeholder-brand-muted focus:outline-none focus:border-brand-yellow"
+                  required
+                />
+                <input
+                  type="tel"
+                  placeholder="Телефон"
+                  value={newDriverPhone}
+                  onChange={e => handlePhoneChange(e.target.value)}
+                  className="bg-brand-dark border border-brand-border rounded-lg px-3 py-2 text-sm text-white placeholder-brand-muted focus:outline-none focus:border-brand-yellow"
+                  required
+                />
+                <input
+                  type="text"
+                  placeholder="PIN (4 цифри)"
+                  value={newDriverPin}
+                  onChange={e => setNewDriverPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                  className="bg-brand-dark border border-brand-border rounded-lg px-3 py-2 text-sm text-white text-center font-display tracking-widest placeholder-brand-muted focus:outline-none focus:border-brand-yellow"
+                  maxLength={4}
+                  required
+                />
+              </div>
+              
+              {addDriverError && (
+                <div className="text-red-500 text-xs">{addDriverError}</div>
+              )}
 
-            <button
-              type="submit"
-              disabled={isAddingDriver}
-              className="btn-primary w-full py-2 flex items-center justify-center gap-2 text-sm font-bold disabled:opacity-50"
-            >
-              {isAddingDriver ? <RefreshCw size={16} className="animate-spin text-dark" /> : <Plus size={16} className="text-dark" />}
-              <span className="text-dark">Додати водія</span>
-            </button>
-          </form>
+              <button
+                type="submit"
+                disabled={isAddingDriver}
+                className="btn-primary w-full py-2 flex items-center justify-center gap-2 text-sm font-bold disabled:opacity-50"
+              >
+                {isAddingDriver ? <RefreshCw size={16} className="animate-spin text-dark" /> : <Plus size={16} className="text-dark" />}
+                <span className="text-dark">Додати водія</span>
+              </button>
+            </form>
+          )}
 
           <div className="flex-1 overflow-y-auto max-h-[300px] space-y-2">
             {isDriversLoading ? (
@@ -1379,13 +1724,15 @@ function DriversSubPanel({ selectedDateUA }: DriversSubPanelProps) {
                     <span className="text-xs bg-brand-dark border border-brand-border px-2 py-1 rounded font-display tracking-widest text-brand-yellow font-bold">
                       PIN: {d.pin_code}
                     </span>
-                    <button
-                      onClick={() => handleDeleteDriver(d.id)}
-                      type="button"
-                      className="text-red-500 hover:text-red-400 p-1 transition-colors"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    {role !== 'junior_dispatcher' && (
+                      <button
+                        onClick={() => handleDeleteDriver(d.id)}
+                        type="button"
+                        className="text-red-500 hover:text-red-400 p-1 transition-colors"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
                   </div>
                 </div>
               ))

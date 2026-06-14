@@ -77,7 +77,7 @@ export const CONTACTS = {
   phone2Display: '097 001 19 00',
   instagram: 'https://instagram.com/comfortplus0777',
   instagramHandle: '@comfortplus0777',
-  email: 'komfortplyus0777@gmail.com',
+  email: 'comfortplus0777@gmail.com',
 };
 
 export const LEGAL_INFO = {
@@ -86,7 +86,7 @@ export const LEGAL_INFO = {
   legalAddress: 'Україна, 82195, Львівська обл., Дрогобицький р-н, село Рибник, вул. Завирська, будинок 8',
   physicalAddress: '82100, Львівська обл., м. Дрогобич, вул. Орлика Пилипа 18/2',
   taxId: '45876032',
-  email: 'komfortplyus0777@gmail.com',
+  email: 'comfortplus0777@gmail.com',
   bankInfo: 'UA363204780000026004924956186 в АБ "УКРГАЗБАНК" МФО 320478',
   director: 'Маршалок Степан Степанович',
   taxGroup: 'Платник єдиного податку 3 група 5%',

@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import type { BookingData } from '../components/booking/BookingForm';
-import { supabase } from '../lib/supabase';
+import { apiClient } from '../lib/apiClient';
 import bcrypt from 'bcryptjs';
 
 
@@ -38,47 +38,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [bookings, setBookings] = useState<BookingRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Ініціалізація: перевірка сесії в localStorage (тільки ID) та завантаження з Supabase
-  useEffect(() => {
-    const initAuth = async () => {
-      const activeUserId = localStorage.getItem('comfort_active_user_id');
-      if (activeUserId) {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', activeUserId)
-          .single();
-
-        if (data && !error) {
-          const mappedUser: User = {
-            id: data.id,
-            name: data.name,
-            phone: data.phone,
-            passwordHash: data.password_hash,
-            completedRides: data.completed_rides,
-            balance: data.balance
-          };
-          setUser(mappedUser);
-          await loadBookings(data.id);
-        } else {
-          localStorage.removeItem('comfort_active_user_id');
-        }
-      }
-      setLoading(false);
-    };
-
-    initAuth();
-  }, []);
-
   const loadBookings = async (userId: string) => {
-    const { data, error } = await supabase
-      .from('bookings')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
-
-    if (data && !error) {
-      const mappedBookings: BookingRecord[] = data.map(b => ({
+    try {
+      const data = await apiClient.getBookings({ user_id: userId });
+      const mappedBookings: BookingRecord[] = data.map((b: any) => ({
         id: b.id,
         from: b.bus_from,
         to: b.bus_to,
@@ -92,66 +55,66 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         createdAt: b.created_at
       }));
       setBookings(mappedBookings);
+    } catch (e) {
+      console.error('Помилка завантаження бронювань:', e);
     }
   };
 
+  // Ініціалізація: перевірка сесії в localStorage (тільки ID) та завантаження з сервера
+  useEffect(() => {
+    const initAuth = async () => {
+      const activeUserId = localStorage.getItem('comfort_active_user_id');
+      if (activeUserId) {
+        try {
+          const data = await apiClient.getProfile(activeUserId);
+          const mappedUser: User = {
+            id: data.id,
+            name: data.name,
+            phone: data.phone,
+            passwordHash: data.password_hash,
+            completedRides: data.completed_rides,
+            balance: data.balance
+          };
+          setUser(mappedUser);
+          await loadBookings(data.id);
+        } catch (e) {
+          localStorage.removeItem('comfort_active_user_id');
+        }
+      }
+      setLoading(false);
+    };
+
+    initAuth();
+  }, []);
+
   const login = async (phone: string, password: string) => {
     setLoading(true);
-    const rawPhone = phone.replace(/\D/g, '').slice(-9); // Останні 9 цифр для надійності
-    
-    // Отримуємо користувача лише за номером телефону
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .ilike('phone', `%${rawPhone}%`)
-      .single();
-
-    if (data && !error) {
-      // Порівнюємо введений пароль з хешем у базі
-      const isMatch = await bcrypt.compare(password, data.password_hash);
-      
-      if (isMatch) {
-        const loggedUser: User = {
-          id: data.id,
-          name: data.name,
-          phone: data.phone,
-          passwordHash: data.password_hash,
-          completedRides: data.completed_rides,
-          balance: data.balance
-        };
-        setUser(loggedUser);
-        localStorage.setItem('comfort_active_user_id', data.id);
-        await loadBookings(data.id);
-        setLoading(false);
-        return true;
-      }
+    try {
+      const data = await apiClient.login(phone, password);
+      const loggedUser: User = {
+        id: data.id,
+        name: data.name,
+        phone: data.phone,
+        passwordHash: data.password_hash,
+        completedRides: data.completed_rides,
+        balance: data.balance
+      };
+      setUser(loggedUser);
+      localStorage.setItem('comfort_active_user_id', data.id);
+      await loadBookings(data.id);
+      setLoading(false);
+      return true;
+    } catch (err) {
+      console.error(err);
+      setLoading(false);
+      return false;
     }
-    setLoading(false);
-    return false;
   };
 
   const register = async (name: string, phone: string, password: string) => {
     setLoading(true);
-    
-    // Хешуємо пароль перед записом у базу
-    const saltRounds = 10;
-    const hashedPassword = await bcrypt.hash(password, saltRounds);
-
-    const newUserRow = {
-      name,
-      phone,
-      password_hash: hashedPassword,
-      completed_rides: 0,
-      balance: 0
-    };
-
-    const { data, error } = await supabase
-      .from('profiles')
-      .insert([newUserRow])
-      .select()
-      .single();
-
-    if (data && !error) {
+    try {
+      const data = await apiClient.register(name, phone, password);
       const newUser: User = {
         id: data.id,
         name: data.name,
@@ -165,9 +128,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setBookings([]);
       setLoading(false);
       return newUser;
+    } catch (err) {
+      console.error(err);
+      setLoading(false);
+      return null;
     }
-    setLoading(false);
-    return null;
   };
 
   const logout = () => {
@@ -187,7 +152,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       finalPrice = 0;
       newCompletedRides = 0;
     } else {
-      // Імітуємо завершення поїздки відразу для демо-лояльності
       newCompletedRides += 1;
     }
 
@@ -201,16 +165,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       price: finalPrice,
       status: 'active',
       passenger_name: bookingData.name,
-      passenger_phone: bookingData.phone
+      passenger_phone: bookingData.phone,
+      pickup_location: bookingData.pickupLocation
     };
 
-    const { data, error } = await supabase
-      .from('bookings')
-      .insert([bookingRow])
-      .select()
-      .single();
-
-    if (data && !error) {
+    try {
+      const data = await apiClient.createBooking(bookingRow);
       const record: BookingRecord = {
         ...bookingData,
         id: data.id,
@@ -220,16 +180,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       };
 
       // Оновлюємо профіль користувача (лояльність)
-      const { data: updatedProfile } = await supabase
-        .from('profiles')
-        .update({ completed_rides: newCompletedRides })
-        .eq('id', user.id)
-        .select()
-        .single();
-
+      const updatedProfile = await apiClient.getProfile(user.id);
       if (updatedProfile) {
         setUser({
-          ...user,
+          id: updatedProfile.id,
+          name: updatedProfile.name,
+          phone: updatedProfile.phone,
+          passwordHash: updatedProfile.password_hash,
           completedRides: updatedProfile.completed_rides,
           balance: updatedProfile.balance
         });
@@ -238,9 +195,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const updatedBookings = [record, ...bookings];
       setBookings(updatedBookings);
       return record;
+    } catch (err) {
+      console.error(err);
+      return null;
     }
-
-    return null;
   };
 
   const cancelBooking = async (id: string) => {
@@ -248,37 +206,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const target = bookings.find(b => b.id === id);
     if (!target || target.status !== 'active') return;
 
-    // 1. Оновлюємо статус в БД
-    const { error: bookingError } = await supabase
-      .from('bookings')
-      .update({ status: 'cancelled' })
-      .eq('id', id);
+    try {
+      await apiClient.updateBooking(id, { status: 'cancelled' });
 
-    if (bookingError) return;
+      // Якщо квиток платний - повертаємо кошти на баланс
+      if (target.price > 0) {
+        await updateBalance(target.price);
+      }
 
-    // 2. Якщо квиток платний - повертаємо кошти на баланс
-    if (target.price > 0) {
-      await updateBalance(target.price);
+      setBookings(bookings.map(b => b.id === id ? { ...b, status: 'cancelled' as const } : b));
+    } catch (err) {
+      console.error('Помилка скасування:', err);
     }
-
-    // 3. Оновлюємо локальний стан
-    setBookings(bookings.map(b => b.id === id ? { ...b, status: 'cancelled' as const } : b));
   };
 
   const updateBalance = async (amount: number) => {
     if (!user) return;
-    
-    const newBalance = user.balance + amount;
-    
-    const { data, error } = await supabase
-      .from('profiles')
-      .update({ balance: newBalance })
-      .eq('id', user.id)
-      .select()
-      .single();
-
-    if (data && !error) {
+    try {
+      const data = await apiClient.updateBalance(user.id, amount);
       setUser({ ...user, balance: data.balance });
+    } catch (e) {
+      console.error('Помилка оновлення балансу:', e);
     }
   };
 

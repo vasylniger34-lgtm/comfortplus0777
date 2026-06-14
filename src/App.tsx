@@ -58,7 +58,7 @@ function MainApp() {
   
   const { user } = useAuth();
   const location = useLocation();
-  const isAdmin = location.pathname === '/admin';
+  const isAdmin = location.pathname.startsWith('/admin');
 
   const scrollToBooking = () => {
     const bookingElement = document.getElementById('booking');
@@ -91,8 +91,7 @@ function MainApp() {
       </Routes>
 
       {!isAdmin && <Footer onOpenLegal={openLegal} />}
-
-      <ChatWidget />
+      {!isAdmin && <ChatWidget />}
 
       <AnimatePresence>
         {paymentData && (

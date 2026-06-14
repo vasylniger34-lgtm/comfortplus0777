@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MessageCircle, X, Send, Bot, User, Phone } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
+import { apiClient } from '../../lib/apiClient';
 import { useAuth } from '../../context/AuthContext';
 
 type Message = {
@@ -77,51 +77,49 @@ export default function ChatWidget() {
     setSessionId(sId);
 
     const loadHistory = async () => {
-      const { data, error } = await supabase
-        .from('chat_messages')
-        .select('*')
-        .eq('session_id', sId)
-        .order('created_at', { ascending: true });
-
-      if (data && !error) {
-        const history: Message[] = data.map(m => ({
-          id: m.id,
-          text: m.text,
-          from: m.is_bot_reply ? 'bot' : 'user',
-          ts: new Date(m.created_at)
-        }));
-        setMessages(prev => [...prev, ...history]);
+      try {
+        const data = await apiClient.getChatMessages(sId);
+        if (data) {
+          const history: Message[] = data.map((m: any) => ({
+            id: m.id,
+            text: m.text,
+            from: m.is_bot_reply ? 'bot' : 'user',
+            ts: new Date(m.created_at)
+          }));
+          setMessages(prev => {
+            const uniqueHistory = history.filter((h: any) => !prev.some(p => p.id === h.id));
+            return [...prev, ...uniqueHistory];
+          });
+        }
+      } catch (err) {
+        console.error('Помилка завантаження історії чату:', err);
       }
     };
 
     loadHistory();
 
-    const channel = supabase
-      .channel('chat_messages')
-      .on('postgres_changes', { 
-        event: 'INSERT', 
-        schema: 'public', 
-        table: 'chat_messages',
-        filter: `session_id=eq.${sId}`
-      }, (payload) => {
-        const newMsg = payload.new;
-        if (newMsg.is_bot_reply) {
-          setMessages(prev => {
-            if (prev.find(m => m.id === newMsg.id)) return prev;
-            return [...prev, {
-              id: newMsg.id,
-              text: newMsg.text,
-              from: 'bot',
-              ts: new Date(newMsg.created_at)
-            }];
-          });
-          if (!open) setUnread(u => u + 1);
-        }
-      })
-      .subscribe();
+    // Приєднуємось до кімнати чату на сервері
+    apiClient.socket.emit('join_chat', sId);
+
+    const handleChatMessage = (newMsg: any) => {
+      if (newMsg.is_bot_reply) {
+        setMessages(prev => {
+          if (prev.find(m => m.id === newMsg.id)) return prev;
+          return [...prev, {
+            id: newMsg.id,
+            text: newMsg.text,
+            from: 'bot',
+            ts: new Date(newMsg.created_at)
+          }];
+        });
+        if (!open) setUnread(u => u + 1);
+      }
+    };
+
+    apiClient.socket.on('chat_message', handleChatMessage);
 
     return () => {
-      supabase.removeChannel(channel);
+      apiClient.socket.off('chat_message', handleChatMessage);
     };
   }, [user]);
 
@@ -160,11 +158,11 @@ export default function ChatWidget() {
     setInput('');
     setTyping(true);
 
-    await supabase
-      .from('chat_messages')
-      .insert([
-        { session_id: sessionId, text: text, is_bot_reply: false }
-      ]);
+    try {
+      await apiClient.sendChatMessage(sessionId, text, false);
+    } catch (err) {
+      console.error('Помилка відправки повідомлення в чат:', err);
+    }
 
     // Відправка в Telegram всім адмінам
     try {
