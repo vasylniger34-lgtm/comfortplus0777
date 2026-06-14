@@ -42,36 +42,52 @@ const ROUTE_SKHIDNYTSIA_TO_LVIV = [
 export const PICKUP_LOCATIONS: Record<string, {name: string, link: string}[]> = {
   skhidnytsia: [
     { name: 'ЗАБРАТИ З ГОТЕЛЮ', link: '' },
-    { name: 'Готель Тустань', link: 'https://maps.app.goo.gl/9S5Fj2L5Sg9qL2Yw8' },
-    { name: 'Ринок', link: 'https://maps.app.goo.gl/Z9JqR5G6H6v8F2fA9' },
-    { name: 'Київська Русь', link: 'https://maps.app.goo.gl/vS8D9L2L6f5R3G7A8' },
-    { name: 'Три сини та донька 4*', link: 'https://maps.app.goo.gl/v6D9L4M2S8R1G3B5A' },
-    { name: 'Східницький замок', link: 'https://maps.app.goo.gl/v8G9L5S2M1R3G4B7A' },
-    { name: 'Діана (Початок селища)', link: 'https://maps.app.goo.gl/v9D4M1S2R5G3B6A8L' },
-    { name: 'Поворот на Борислав', link: 'https://maps.app.goo.gl/v7G5L2S1M3R4G9B8A' }
+    { name: 'А-готель (3 джерело)', link: '' },
+    { name: 'Київська Русь (ОККО)', link: '' },
+    { name: 'поворот на Діану (біля чайничка)', link: '' },
+    { name: 'Дім Молитви (скарбничка, ринок)', link: '' },
+    { name: 'ТуСтань (автостанція)', link: '' },
+    { name: 'Содова (2с)', link: '' }
   ],
   boryslav: [
-    { name: 'Поворот на Коваліва. АТБ', link: 'https://maps.app.goo.gl/9tH6M4L1S8R2G5B7A' },
-    { name: 'Тустановичі. 5 школа', link: 'https://maps.app.goo.gl/v8D5M4L2S1R3G9B6A' },
-    { name: 'Центр. Нова пошта 1', link: 'https://maps.app.goo.gl/v7G3M1S5R2G4B8A9L' }
+    { name: 'Тустановичі (5 школа)', link: '' },
+    { name: 'пов на Коваліва', link: '' },
+    { name: 'Циганська площа', link: '' },
+    { name: '7 школа', link: '' },
+    { name: 'ПриватʼРайфайзен (У лева)', link: '' },
+    { name: 'площа І.Франка, центр, таксі, фонтан', link: '' },
+    { name: 'Міська рада (Спар, Дніпром)', link: '' },
+    { name: 'Взуттєва фабрика', link: '' },
+    { name: 'Пам’ятник Степану Бандері', link: '' },
+    { name: 'Мражниця', link: '' },
+    { name: 'Крутогір', link: '' },
+    { name: 'LuxWash мийка, після перевалу', link: '' }
   ],
   truskavets: [
     { name: 'ЗАБРАТИ З ГОТЕЛЮ', link: '' },
-    { name: 'Вишенька. Лісова пісня', link: 'https://maps.app.goo.gl/v1G4L2S5M8R3G6B9A' },
-    { name: 'Автовокзал', link: 'https://maps.app.goo.gl/v9M5L1S2R3G4B7A8L' },
-    { name: 'Церква св. Іллі. Поліція', link: 'https://maps.app.goo.gl/v5G3M1S8R2G4B9A7L' },
-    { name: 'Стебницьке кільце. ТЦ Вектор', link: 'https://maps.app.goo.gl/v2G9M4L5S1R3G8B6A' }
+    { name: 'Сосновий Бір', link: '' },
+    { name: 'Вишенька (Лісова пісня)', link: '' },
+    { name: '1 школа (Перед Дрогобицьким кільцем)', link: '' },
+    { name: 'Автовокзал', link: '' },
+    { name: 'церква Іллі (на Мазепи)', link: '' },
+    { name: 'Стебницьке кільце (навпроти ДивоЦіну)', link: '' },
+    { name: 'санаторій Полонина (виїзд)', link: '' }
   ],
   stebnik: [
-    { name: 'Рідний край. Скрент', link: 'https://maps.app.goo.gl/v4G8M1S2R5G3B9A7L' },
-    { name: 'Високий замок. Рукавичка', link: 'https://maps.app.goo.gl/v1G9M5L2S8R3G4B6A' }
+    { name: 'Високий замок', link: '' },
+    { name: 'Скрент', link: '' },
+    { name: 'Діброва', link: '' }
   ],
   lviv: [
-    { name: 'Головний залізничний вокзал (Платна парковка)', link: 'https://maps.app.goo.gl/v3G8L1S5M2R4G7B9A' },
-    { name: 'ТЦ Скриня', link: 'https://maps.app.goo.gl/v9M1L5S2R3G4B8A7L' },
-    { name: '«ЖК Парус»', link: '' },
-    { name: 'ТЦ «АШАН»', link: '' },
-    { name: 'ТЦ Victoria Gardens Автосалон Toyota', link: '' }
+    { name: 'Victoria Gardens (автосалон Toyota)', link: '' },
+    { name: 'Щирецька (Нова Лінія)', link: '' },
+    { name: 'АшанСіті (вул.В.Великого)', link: '' },
+    { name: 'Психічна лікарня', link: '' },
+    { name: 'Кардіологічний центр', link: '' },
+    { name: 'ЖК «Парус» (вул.Кульпарківська)', link: '' },
+    { name: 'ТЦ «Скриня»', link: '' },
+    { name: 'Приміський ринок', link: '' },
+    { name: 'Залізничний Вокзал (Платна парковка)', link: '' }
   ]
 };
 
