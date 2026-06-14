@@ -1,36 +1,152 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Phone, Plus, RefreshCw, X, Calendar as CalendarIcon, Clock, Edit2, Trash2, Check, PhoneCall, BarChart2, Users, Key } from 'lucide-react';
-import { supabase } from '../../lib/supabaseClient';
+import { User, Phone, Plus, RefreshCw, X, Calendar as CalendarIcon, Clock, Edit2, Trash2, Check, PhoneCall, BarChart2, Users, Key, ChevronDown, ChevronUp } from 'lucide-react';
+import { apiClient } from '../../lib/apiClient';
 import { driverService } from '../../lib/driverService';
 import type { DriverProfile, DriverAssignment } from '../../lib/driverService';
 
-const CREW_TABS = ['05:50', '06:20', '07:10', '08:50', '09:30', '10:35', '12:40', 'водії', 'звіт'];
+const CREW_TABS = ['06:20', '07:10', '08:15', '09:30', '10:35', '11:10', 'водії', 'звіт'];
 
-const VALID_TIMES = [
-  '05:50', '06:20', '07:10', '08:10', '08:50', '09:00', '09:30', 
-  '10:15', '10:35', '11:10', '11:50', '12:00', '12:20', '12:40', 
-  '13:10', '13:20', '14:10', '14:50', '15:30', '16:10', '16:20', 
-  '17:00', '17:40', '18:20', '19:20', '20:00', '20:40'
-].sort();
+const CREW_RUNS: Record<string, { time: string; from: string; to: string }[]> = {
+  '06:20': [
+    { time: '06:20', from: 'Східниця', to: 'Львів' },
+    { time: '09:00', from: 'Львів', to: 'Східниця' },
+    { time: '12:00', from: 'Східниця', to: 'Львів' },
+    { time: '14:50', from: 'Львів', to: 'Східниця' }
+  ],
+  '07:10': [
+    { time: '07:10', from: 'Східниця', to: 'Львів' },
+    { time: '10:15', from: 'Львів', to: 'Східниця' },
+    { time: '13:20', from: 'Східниця', to: 'Львів' },
+    { time: '16:10', from: 'Львів', to: 'Східниця' }
+  ],
+  '08:15': [
+    { time: '08:15', from: 'Східниця', to: 'Львів' },
+    { time: '11:10', from: 'Львів', to: 'Східниця' },
+    { time: '15:30', from: 'Східниця', to: 'Львів' },
+    { time: '18:20', from: 'Львів', to: 'Східниця' }
+  ],
+  '09:30': [
+    { time: '09:30', from: 'Східниця', to: 'Львів' },
+    { time: '12:20', from: 'Львів', to: 'Східниця' },
+    { time: '16:20', from: 'Східниця', to: 'Львів' },
+    { time: '19:20', from: 'Львів', to: 'Східниця' }
+  ],
+  '10:35': [
+    { time: '10:35', from: 'Східниця', to: 'Львів' },
+    { time: '13:10', from: 'Львів', to: 'Східниця' },
+    { time: '17:00', from: 'Східниця', to: 'Львів' },
+    { time: '20:00', from: 'Львів', to: 'Східниця' }
+  ],
+  '11:10': [
+    { time: '11:10', from: 'Східниця', to: 'Львів' },
+    { time: '14:10', from: 'Львів', to: 'Східниця' },
+    { time: '17:40', from: 'Східниця', to: 'Львів' },
+    { time: '20:40', from: 'Львів', to: 'Східниця' }
+  ]
+};
+
+
+const TIMES_LVIV_TO_SKHIDNYTSIA = [
+  '09:00', '10:15', '11:10', '12:20', '13:10', '14:10', '14:50', '16:10', '18:20', '19:20', '20:00', '20:40'
+];
+
+const TIMES_SKHIDNYTSIA_TO_LVIV = [
+  '06:20', '07:10', '08:15', '09:30', '10:35', '11:10', '12:00', '13:20', '15:30', '16:20', '17:00', '17:40'
+];
+
+const getValidTimesForRoute = (from: string, to: string) => {
+  const isLvivDeparture = isLvivToSkhidnytsia(from, to);
+  return isLvivDeparture ? TIMES_LVIV_TO_SKHIDNYTSIA : TIMES_SKHIDNYTSIA_TO_LVIV;
+};
 
 const LOCATIONS = ['Львів', 'Східниця', 'Трускавець', 'Борислав', 'Стебник'];
 
-// Мапінг часу до екіпажу
-const getCrewByTime = (time: string) => {
-  const mapping: Record<string, string> = {
-    '05:50': '05:50', '08:10': '05:50', '11:10': '05:50', '14:10': '05:50',
-    '06:20': '06:20', '09:00': '06:20', '12:00': '06:20', '14:50': '06:20',
-    '07:10': '07:10', '10:15': '07:10', '13:20': '07:10', '16:10': '07:10',
-    '08:50': '08:50', '11:50': '08:50', '15:30': '08:50', '18:20': '08:50',
-    '09:30': '09:30', '12:20': '09:30', '16:20': '09:30', '19:20': '09:30',
-    '10:35': '10:35', '13:10': '10:35', '17:00': '10:35', '20:00': '10:35',
-    '12:40': '12:40', '15:30': '12:40', '17:40': '12:40', '20:40': '12:40'
-  };
-  return mapping[time] || '';
+const isLvivToSkhidnytsia = (from: string, to: string) => {
+  const lvivRoute = ['Львів', 'Стебник', 'Трускавець', 'Борислав', 'Східниця'];
+  const fromIdx = lvivRoute.indexOf(from);
+  const toIdx = lvivRoute.indexOf(to);
+  return fromIdx !== -1 && toIdx !== -1 && fromIdx < toIdx;
+};
+
+const CITY_KEYS: Record<string, string> = {
+  'Східниця': 'skhidnytsia',
+  'Борислав': 'boryslav',
+  'Трускавець': 'truskavets',
+  'Стебник': 'stebnik',
+  'Львів': 'lviv'
+};
+
+const STATION_PICKUP_LOCATIONS: Record<string, string[]> = {
+  'skhidnytsia': [
+    'ЗАБРАТИ З ГОТЕЛЮ',
+    'Готель Тустань',
+    'Ринок',
+    'Київська Русь',
+    'Три сини та донька 4*',
+    'Східницький замок',
+    'Діана (Початок селища)',
+    'Поворот на Борислав'
+  ],
+  'boryslav': [
+    'Поворот на Коваліва. АТБ',
+    'Тустановичі. 5 школа',
+    'Центр. Нова пошта 1'
+  ],
+  'truskavets': [
+    'ЗАБРАТИ З ГОТЕЛЮ',
+    'Вишенька. Лісова пісня',
+    'Автовокзал',
+    'Церква св. Іллі. Поліція',
+    'Стебницьке кільце. ТЦ Вектор'
+  ],
+  'stebnik': [
+    'Рідний край. Скрент',
+    'Високий замок. Рукавичка'
+  ],
+  'lviv': [
+    'Головний залізничний вокзал (Платна парковка)',
+    'ТЦ Скриня',
+    '«ЖК Парус»',
+    'ТЦ «АШАН»',
+    'ТЦ Victoria Gardens Автосалон Toyota'
+  ]
+};
+
+// Мапінг часу до екіпажу з урахуванням напрямку
+const getCrewByTime = (time: string, fromCity: string, toCity: string) => {
+  const isLvivDeparture = isLvivToSkhidnytsia(fromCity, toCity);
+  if (isLvivDeparture) {
+    const mapping: Record<string, string> = {
+      '09:00': '06:20', '14:50': '06:20', // Crew 1
+      '10:15': '07:10', '16:10': '07:10', // Crew 2
+      '11:10': '08:15', '18:20': '08:15', // Crew 3
+      '12:20': '09:30', '19:20': '09:30', // Crew 4
+      '13:10': '10:35', '20:00': '10:35', // Crew 5
+      '14:10': '11:10', '20:40': '11:10', // Crew 6
+    };
+    return mapping[time] || '';
+  } else {
+    const mapping: Record<string, string> = {
+      '06:20': '06:20', '12:00': '06:20', // Crew 1
+      '07:10': '07:10', '13:20': '07:10', // Crew 2
+      '08:15': '08:15', '15:30': '08:15', // Crew 3
+      '09:30': '09:30', '16:20': '09:30', // Crew 4
+      '10:35': '10:35', '17:00': '10:35', // Crew 5
+      '11:10': '11:10', '17:40': '11:10', // Crew 6
+    };
+    return mapping[time] || '';
+  }
 };
 
 // Хелпери для дат
+const getUADateString = (dateObj: Date) => {
+  const d = String(dateObj.getDate()).padStart(2, '0');
+  const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const y = dateObj.getFullYear();
+  return `${d}.${m}.${y}`;
+};
+
 const formatDateToUA = (isoDate: string) => {
   if (!isoDate) return '';
   const [y, m, d] = isoDate.split('-');
@@ -48,10 +164,39 @@ const getTodayISO = () => new Date().toISOString().split('T')[0];
 export default function DispatcherPanel({ onLogout }: { onLogout?: () => void }) {
   const [bookings, setBookings] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedDateUA, setSelectedDateUA] = useState(new Date().toLocaleDateString('uk-UA'));
-  const [activeTab, setActiveTab] = useState('05:50');
+  const [selectedDateUA, setSelectedDateUA] = useState(getUADateString(new Date()));
+  const [activeTab, setActiveTab] = useState('06:20');
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingBooking, setEditingBooking] = useState<any>(null);
+  const [visibleDaysCount, setVisibleDaysCount] = useState(7);
+  const [assignments, setAssignments] = useState<any[]>([]);
+  const [drivers, setDrivers] = useState<any[]>([]);
+
+  const getDaysArray = () => {
+    const days = [];
+    const today = new Date();
+    for (let i = 0; i < visibleDaysCount; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() + i);
+      const uaDate = getUADateString(d);
+      
+      let label = '';
+      if (i === 0) label = 'Сьогодні';
+      else if (i === 1) label = 'Завтра';
+      else {
+        // Отримуємо день тижня та число.місяць скорочено (наприклад: Ср, 27.05)
+        const dayOfWeek = d.toLocaleDateString('uk-UA', { weekday: 'short' });
+        const dayMonth = d.toLocaleDateString('uk-UA', { day: 'numeric', month: 'numeric' });
+        label = `${dayOfWeek.toUpperCase()}, ${dayMonth}`;
+      }
+      
+      days.push({
+        dateUA: uaDate,
+        label: label
+      });
+    }
+    return days;
+  };
   
   // Форма нової броні
   const [newBooking, setNewBooking] = useState({
@@ -61,65 +206,115 @@ export default function DispatcherPanel({ onLogout }: { onLogout?: () => void })
     to: 'Східниця',
     pickup_location: '',
     date: getTodayISO(), // Зберігаємо в ISO для інпуту
-    departure_time: '05:50',
+    departure_time: '09:00',
     seats: 1,
     price: 350,
-    crew: '05:50',
+    crew: '06:20',
     status: 'active'
   });
 
+  const handleNewBookingRouteUpdate = (updates: Partial<typeof newBooking>) => {
+    const updated = { ...newBooking, ...updates };
+    const validTimes = getValidTimesForRoute(updated.from, updated.to);
+    
+    // Якщо поточний час не є валідним для нового напрямку, ставимо першу доступну годину
+    if (!validTimes.includes(updated.departure_time)) {
+      updated.departure_time = validTimes[0];
+    }
+    
+    setNewBooking(updated);
+  };
+
+  const handleEditingBookingRouteUpdate = (updates: Partial<typeof editingBooking>) => {
+    const updated = { ...editingBooking, ...updates };
+    const validTimes = getValidTimesForRoute(updated.from, updated.to);
+    
+    if (!validTimes.includes(updated.departure_time)) {
+      updated.departure_time = validTimes[0];
+    }
+    
+    setEditingBooking(updated);
+  };
+
+  const openAddModalForRun = (time: string, fromCity: string, toCity: string) => {
+    setNewBooking({
+      ...newBooking,
+      date: formatDateToISO(selectedDateUA) || getTodayISO(),
+      crew: activeTab,
+      departure_time: time,
+      from: fromCity,
+      to: toCity,
+      name: '',
+      phone: '+380',
+      pickup_location: '',
+      seats: 1,
+      price: 350,
+      status: 'active'
+    });
+    setShowAddModal(true);
+  };
+
+  const [expandedRuns, setExpandedRuns] = useState<Record<string, boolean>>({});
+
+  const toggleRunExpanded = (time: string) => {
+    setExpandedRuns(prev => ({
+      ...prev,
+      [time]: !prev[time]
+    }));
+  };
+
+
+
+  const fetchAssignmentsAndDrivers = async () => {
+    try {
+      const [driversData, assignmentsData] = await Promise.all([
+        apiClient.getDrivers(),
+        apiClient.getAssignments(selectedDateUA)
+      ]);
+      setDrivers(driversData || []);
+      setAssignments(assignmentsData || []);
+    } catch (e) {
+      console.error('Помилка завантаження водіїв/призначень:', e);
+    }
+  };
+
   const fetchBookings = async () => {
     setIsLoading(true);
-    const { data, error } = await supabase
-      .from('bookings')
-      .select('*')
-      .eq('date', selectedDateUA)
-      .order('departure_time', { ascending: true });
-      
-    if (error) {
-      console.error('Помилка завантаження:', error);
-    } else {
+    try {
+      const data = await apiClient.getBookings({ date: selectedDateUA });
       setBookings(data || []);
+    } catch (error) {
+      console.error('Помилка завантаження:', error);
     }
     setIsLoading(false);
   };
 
   useEffect(() => {
     fetchBookings();
+    fetchAssignmentsAndDrivers();
 
-    const channel = supabase
-      .channel('dispatcher-db-changes')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'bookings' },
-        () => {
-          fetchBookings();
-        }
-      )
-      .subscribe();
+    // Підписка на сокети
+    apiClient.socket.on('bookings_changed', fetchBookings);
+    apiClient.socket.on('assignments_changed', fetchAssignmentsAndDrivers);
 
     return () => {
-      supabase.removeChannel(channel);
+      apiClient.socket.off('bookings_changed', fetchBookings);
+      apiClient.socket.off('assignments_changed', fetchAssignmentsAndDrivers);
     };
   }, [selectedDateUA]);
 
   const handleAddBooking = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const crew = getCrewByTime(newBooking.departure_time);
+    const crew = getCrewByTime(newBooking.departure_time, newBooking.from, newBooking.to);
     const payload = { 
       ...newBooking, 
       crew,
       date: formatDateToUA(newBooking.date) // Конвертуємо в ДД.ММ.РРРР для бази
     };
 
-    const { error } = await supabase
-      .from('bookings')
-      .insert([payload]);
-
-    if (error) {
-      alert('Помилка додавання: ' + error.message);
-    } else {
+    try {
+      await apiClient.createBooking(payload);
       setShowAddModal(false);
       setNewBooking({
         name: '',
@@ -128,50 +323,44 @@ export default function DispatcherPanel({ onLogout }: { onLogout?: () => void })
         to: 'Східниця',
         pickup_location: '',
         date: getTodayISO(),
-        departure_time: activeTab === 'звіт' || activeTab === 'водії' ? '05:50' : activeTab,
+        departure_time: activeTab === 'звіт' || activeTab === 'водії' ? '06:20' : activeTab,
         seats: 1,
         price: 350,
-        crew: activeTab === 'звіт' || activeTab === 'водії' ? '05:50' : activeTab,
+        crew: activeTab === 'звіт' || activeTab === 'водії' ? '06:20' : activeTab,
         status: 'active'
       });
       fetchBookings();
+    } catch (err: any) {
+      alert('Помилка додавання: ' + err.message);
     }
   };
 
   const handleUpdateBooking = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const crew = getCrewByTime(editingBooking.departure_time);
+    const crew = getCrewByTime(editingBooking.departure_time, editingBooking.from, editingBooking.to);
     const payload = { 
       ...editingBooking, 
       crew,
       date: editingBooking.date.includes('-') ? formatDateToUA(editingBooking.date) : editingBooking.date
     };
 
-    const { error } = await supabase
-      .from('bookings')
-      .update(payload)
-      .eq('id', editingBooking.id);
-
-    if (error) {
-      alert('Помилка оновлення: ' + error.message);
-    } else {
+    try {
+      await apiClient.updateBooking(editingBooking.id, payload);
       setEditingBooking(null);
       fetchBookings();
+    } catch (err: any) {
+      alert('Помилка оновлення: ' + err.message);
     }
   };
 
   const handleDeleteBooking = async (id: string) => {
     if (window.confirm('Ви впевнені, що хочете видалити це бронювання?')) {
-      const { error } = await supabase
-        .from('bookings')
-        .delete()
-        .eq('id', id);
-
-      if (error) {
-        alert('Помилка видалення: ' + error.message);
-      } else {
+      try {
+        await apiClient.deleteBooking(id);
         fetchBookings();
+      } catch (err: any) {
+        alert('Помилка видалення: ' + err.message);
       }
     }
   };
@@ -179,16 +368,20 @@ export default function DispatcherPanel({ onLogout }: { onLogout?: () => void })
   const setDay = (offset: number) => {
     const d = new Date();
     d.setDate(d.getDate() + offset);
-    setSelectedDateUA(d.toLocaleDateString('uk-UA'));
+    setSelectedDateUA(getUADateString(d));
   };
 
   const handlePhoneChange = (val: string, setter: (v: any) => void, obj: any) => {
-    // Не дозволяємо видалити +380
-    if (!val.startsWith('+380')) {
-      setter({ ...obj, phone: '+380' });
+    const prefix = '+380';
+    if (!val.startsWith(prefix)) {
+      setter({ ...obj, phone: prefix });
       return;
     }
-    setter({ ...obj, phone: val });
+    // Очищаємо всі символи після +380 від літер/знаків, залишаємо лише цифри
+    const suffix = val.substring(prefix.length).replace(/\D/g, '');
+    // Обмежуємо довжину 9 цифрами (разом з префіксом — 13 символів)
+    const limitedSuffix = suffix.substring(0, 9);
+    setter({ ...obj, phone: prefix + limitedSuffix });
   };
 
   // Групуємо броні за часом для поточного екіпажу
@@ -221,16 +414,15 @@ export default function DispatcherPanel({ onLogout }: { onLogout?: () => void })
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <h1 className="text-3xl font-display font-black text-white">Панель Диспетчера</h1>
-            <p className="text-brand-muted text-sm">Керування бронюваннями (Google Sheets Style)</p>
           </div>
           
           <div className="flex items-center gap-3 w-full md:w-auto">
             <button 
               onClick={() => {
-                setNewBooking({...newBooking, date: getTodayISO(), crew: activeTab === 'звіт' || activeTab === 'водії' ? '05:50' : activeTab, departure_time: activeTab === 'звіт' || activeTab === 'водії' ? '05:50' : activeTab});
+                setNewBooking({...newBooking, date: getTodayISO(), crew: activeTab === 'звіт' || activeTab === 'водії' ? '06:20' : activeTab, departure_time: activeTab === 'звіт' || activeTab === 'водії' ? '06:20' : activeTab});
                 setShowAddModal(true);
               }}
-              className="btn-primary flex items-center gap-2 px-5 py-2.5 shadow-brand text-dark font-bold"
+              className="btn-primary flex items-center justify-center gap-2 px-5 py-2.5 shadow-brand text-dark font-bold flex-1 md:flex-none"
             >
               <Plus size={18} />
               Додати бронь
@@ -239,7 +431,7 @@ export default function DispatcherPanel({ onLogout }: { onLogout?: () => void })
             {onLogout && (
               <button 
                 onClick={onLogout}
-                className="bg-brand-surface border border-brand-border hover:bg-brand-surface/80 text-white flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold transition-colors"
+                className="bg-brand-surface border border-brand-border hover:bg-brand-surface/80 text-white flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-bold transition-colors flex-1 md:flex-none"
               >
                 Вийти
               </button>
@@ -248,25 +440,48 @@ export default function DispatcherPanel({ onLogout }: { onLogout?: () => void })
         </div>
 
         {/* Дата */}
-        <div className="flex gap-2 overflow-x-auto pb-2">
-          <button 
-            onClick={() => setDay(0)}
-            className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors ${selectedDateUA === new Date().toLocaleDateString('uk-UA') ? 'bg-brand-yellow text-brand-dark' : 'bg-brand-surface text-white border border-brand-border'}`}
-          >
-            Сьогодні
-          </button>
-          <button 
-            onClick={() => setDay(1)}
-            className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors ${selectedDateUA === new Date(Date.now() + 86400000).toLocaleDateString('uk-UA') ? 'bg-brand-yellow text-brand-dark' : 'bg-brand-surface text-white border border-brand-border'}`}
-          >
-            Завтра
-          </button>
-          <div className="relative">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bg-brand-surface border border-brand-border p-4 rounded-2xl flex-shrink-0">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 no-scrollbar">
+            <div className="flex gap-2">
+              {getDaysArray().map((day) => {
+                const isActive = selectedDateUA === day.dateUA;
+                return (
+                  <button
+                    key={day.dateUA}
+                    onClick={() => setSelectedDateUA(day.dateUA)}
+                    className={`px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex-shrink-0 border
+                      ${isActive 
+                        ? 'bg-brand-yellow text-brand-dark border-brand-yellow shadow-brand font-black scale-105' 
+                        : 'bg-brand-surface text-brand-muted border-brand-border hover:text-white hover:border-brand-yellow/30'
+                      }
+                    `}
+                  >
+                    {day.label}
+                  </button>
+                );
+              })}
+              
+              {/* Кнопка +7 днів */}
+              <button
+                type="button"
+                onClick={() => setVisibleDaysCount(prev => prev + 7)}
+                className="px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider bg-brand-dark border border-dashed border-brand-border text-brand-yellow hover:border-brand-yellow hover:bg-brand-yellow/5 transition-all flex-shrink-0 flex items-center gap-1"
+                title="Додати ще 7 днів"
+              >
+                <Plus size={14} /> + 7 днів
+              </button>
+            </div>
+          </div>
+
+          <div className="h-6 w-px bg-brand-border flex-shrink-0 mx-2 hidden sm:block" />
+
+          {/* Ручний ввід дати */}
+          <div className="relative flex-shrink-0 w-full sm:w-auto">
             <input 
               type="text" 
               value={selectedDateUA}
               onChange={(e) => setSelectedDateUA(e.target.value)}
-              className="bg-brand-surface border border-brand-border rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-brand-yellow w-32"
+              className="bg-brand-surface border border-brand-border rounded-xl px-4 py-2 text-xs font-bold text-white focus:outline-none focus:border-brand-yellow w-full sm:w-28 text-center"
               placeholder="ДД.ММ.РРРР"
             />
           </div>
@@ -275,8 +490,57 @@ export default function DispatcherPanel({ onLogout }: { onLogout?: () => void })
         {/* Основний контент (Таблиці або Звіт) */}
         <div className="flex-1 bg-brand-surface border border-brand-border rounded-2xl overflow-hidden flex flex-col">
           
+          {/* Таби зверху (перенесено з низу) */}
+          <div className="bg-brand-dark border-b border-brand-border flex overflow-x-auto no-scrollbar flex-shrink-0">
+            {CREW_TABS.map(tab => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-6 py-3 text-sm font-bold transition-all border-r border-brand-border flex-shrink-0
+                  ${activeTab === tab 
+                    ? 'bg-brand-surface text-brand-yellow border-b-2 border-b-brand-yellow' 
+                    : 'text-brand-muted hover:text-white hover:bg-brand-surface/50'
+                  }
+                  ${tab === 'звіт' || tab === 'водії' ? 'bg-brand-yellow/5' : ''}
+                `}
+              >
+                {tab === 'звіт' ? '📊 Звіт' : tab === 'водії' ? '👥 Водії' : tab}
+              </button>
+            ))}
+          </div>
+
+          {/* Інформація про водія та авто під датами (вкладка екіпажу) */}
+          {activeTab !== 'водії' && activeTab !== 'звіт' && (() => {
+            const assignmentForCrew = assignments.find(a => a.crew === activeTab);
+            const assignedDriver = drivers.find(d => d.id === assignmentForCrew?.driver_id);
+            const driverName = assignedDriver ? assignedDriver.name : 'Не призначено';
+            const carNumber = assignmentForCrew?.car || 'Не призначено';
+
+            return (
+              <div className="bg-brand-dark/40 px-6 py-3.5 border-b border-brand-border flex flex-wrap gap-4 items-center justify-between flex-shrink-0">
+                <div className="flex items-center gap-4 flex-wrap">
+                  <div className="text-xs uppercase font-bold text-brand-muted tracking-wide">Поточний екіпаж:</div>
+                  <div className="text-sm font-black text-brand-yellow bg-brand-yellow/10 px-3 py-1 rounded border border-brand-yellow/20">
+                    ЕКІПАЖ: {activeTab}
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-4 text-xs font-bold uppercase tracking-wider flex-wrap">
+                  <div className="flex items-center gap-1.5 bg-brand-surface px-3 py-1.5 rounded-lg border border-brand-border">
+                    <span className="text-brand-muted">Водій:</span>
+                    <span className="text-white">{driverName}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 bg-brand-surface px-3 py-1.5 rounded-lg border border-brand-border">
+                    <span className="text-brand-muted">Авто:</span>
+                    <span className="text-white font-mono">{carNumber}</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+          
           {/* Контент */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-8">
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 sm:space-y-8">
             {activeTab === 'водії' ? (
               <DriversSubPanel selectedDateUA={selectedDateUA} />
             ) : activeTab === 'звіт' ? (
@@ -299,111 +563,250 @@ export default function DispatcherPanel({ onLogout }: { onLogout?: () => void })
 
                 <div className="bg-brand-dark rounded-xl border border-brand-border overflow-hidden">
                   <div className="p-4 border-b border-brand-border font-bold text-white">Розподіл по екіпажах</div>
-                  <table className="w-full text-left">
-                    <thead className="text-brand-muted text-xs uppercase bg-brand-surface">
-                      <tr>
-                        <th className="px-4 py-2">Екіпаж</th>
-                        <th className="px-4 py-2">Пасажирів</th>
-                        <th className="px-4 py-2">Каса</th>
-                      </tr>
-                    </thead>
-                    <tbody className="text-sm text-white divide-y divide-brand-border">
-                      {Object.keys(crewBreakdown).map(crew => (
-                        <tr key={crew} className="hover:bg-brand-surface/50">
-                          <td className="px-4 py-3 font-bold text-brand-yellow">{crew}</td>
-                          <td className="px-4 py-3">{crewBreakdown[crew].passengers}</td>
-                          <td className="px-4 py-3 text-green-500">{crewBreakdown[crew].sum} грн</td>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                      <thead className="text-brand-muted text-xs uppercase bg-brand-surface">
+                        <tr>
+                          <th className="px-4 py-2">Екіпаж</th>
+                          <th className="px-4 py-2">Водій / Авто</th>
+                          <th className="px-4 py-2">Пасажирів</th>
+                          <th className="px-4 py-2">Каса</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="text-sm text-white divide-y divide-brand-border">
+                        {Object.keys(crewBreakdown).map(crew => {
+                          const assignmentForCrew = assignments.find(a => a.crew === crew);
+                          const assignedDriver = drivers.find(d => d.id === assignmentForCrew?.driver_id);
+                          const driverName = assignedDriver ? assignedDriver.name : 'Не призначено';
+                          const carNumber = assignmentForCrew?.car || 'Не призначено';
+
+                          return (
+                            <tr key={crew} className="hover:bg-brand-surface/50">
+                              <td className="px-4 py-3 font-bold text-brand-yellow">{crew}</td>
+                              <td className="px-4 py-3 text-xs">
+                                <div className="font-bold">{driverName}</div>
+                                {assignmentForCrew?.car && <div className="text-brand-muted font-mono mt-0.5 uppercase">{carNumber}</div>}
+                              </td>
+                              <td className="px-4 py-3">{crewBreakdown[crew].passengers}</td>
+                              <td className="px-4 py-3 text-green-500">{crewBreakdown[crew].sum} грн</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             ) : (
               // Вигляд Таблиць
-              Object.keys(groupedBookings).length === 0 ? (
-                <div className="text-center text-brand-muted py-10">
-                  Немає бронювань для цього екіпажу на цей день
-                </div>
-              ) : (
-                Object.keys(groupedBookings).sort().map(time => (
-                  <div key={time} className="space-y-2">
-                    <div className="bg-brand-dark px-4 py-2 rounded-lg border border-brand-yellow/20 flex justify-between items-center">
-                      <span className="font-display font-black text-brand-yellow text-lg">{time}</span>
-                      <span className="text-xs text-brand-muted uppercase font-bold">Рейс</span>
+              (() => {
+                const runs = CREW_RUNS[activeTab] || [];
+                if (runs.length === 0) {
+                  return (
+                    <div className="text-center text-brand-muted py-10">
+                      Немає визначених рейсів для цієї вкладки
                     </div>
-                    
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left border-collapse">
-                        <thead className="text-brand-muted text-xs uppercase tracking-wider">
-                          <tr className="border-b border-brand-border">
-                            <th className="px-4 py-2 font-medium w-10">№</th>
-                            <th className="px-4 py-2 font-medium">Клієнт</th>
-                            <th className="px-4 py-2 font-medium">Маршрут</th>
-                            <th className="px-4 py-2 font-medium">Телефон</th>
-                            <th className="px-4 py-2 font-medium">Зупинка</th>
-                            <th className="px-4 py-2 font-medium">Дії</th>
-                          </tr>
-                        </thead>
-                        <tbody className="text-sm text-white divide-y divide-brand-border/50">
-                          {groupedBookings[time].map((booking, idx) => (
-                            <tr key={booking.id} className="hover:bg-brand-yellow/5 transition-colors">
-                              <td className="px-4 py-3 text-brand-muted font-mono">{idx + 1}.</td>
-                              <td className="px-4 py-3 font-medium">{booking.name} ({booking.seats} м.)</td>
-                              <td className="px-4 py-3 text-xs">{booking.from} → {booking.to}</td>
-                              <td className="px-4 py-3 font-mono">{booking.phone}</td>
-                              <td className="px-4 py-3 text-xs text-brand-muted">{booking.pickup_location || '-'}</td>
-                              <td className="px-4 py-3">
-                                <div className="flex items-center gap-2">
-                                  <a href={`tel:${booking.phone}`} className="text-green-500 hover:text-green-400 p-1">
-                                    <PhoneCall size={16} />
-                                  </a>
-                                  <button 
-                                    onClick={() => {
-                                      // Конвертуємо дату для інпуту
-                                      const isoDate = formatDateToISO(booking.date);
-                                      setEditingBooking({...booking, date: isoDate});
-                                    }}
-                                    className="text-brand-yellow hover:text-brand-gold p-1"
-                                  >
-                                    <Edit2 size={16} />
-                                  </button>
-                                  <button 
-                                    onClick={() => handleDeleteBooking(booking.id)}
-                                    className="text-red-500 hover:text-red-400 p-1"
-                                  >
-                                    <Trash2 size={16} />
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                ))
-              )
-            )}
-          </div>
+                  );
+                }
 
-          {/* Таби знизу (як в Екселі) */}
-          <div className="bg-brand-dark border-t border-brand-border flex overflow-x-auto no-scrollbar">
-            {CREW_TABS.map(tab => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`px-6 py-3 text-sm font-bold transition-all border-r border-brand-border flex-shrink-0
-                  ${activeTab === tab 
-                    ? 'bg-brand-surface text-brand-yellow border-t-2 border-t-brand-yellow' 
-                    : 'text-brand-muted hover:text-white hover:bg-brand-surface/50'
-                  }
-                  ${tab === 'звіт' || tab === 'водії' ? 'bg-brand-yellow/5' : ''}
-                `}
-              >
-                {tab === 'звіт' ? '📊 Звіт' : tab === 'водії' ? '👥 Водії' : tab}
-              </button>
-            ))}
+                return (
+                  <div className="space-y-8">
+                      {runs.map(run => {
+                        // Фільтруємо бронювання саме для цього рейсу (час та екіпаж)
+                        const runBookings = bookings.filter(
+                          b => b.departure_time === run.time && b.crew === activeTab
+                        );
+
+                        // Будуємо 12 місць
+                        const slots = Array.from({ length: 12 }, (_, index) => {
+                          return {
+                            seatNumber: index + 1,
+                            booking: null as any
+                          };
+                        });
+
+                        let currentSlotIdx = 0;
+                        runBookings.forEach(booking => {
+                          const requestedSeats = booking.seats || 1;
+                          for (let s = 0; s < requestedSeats; s++) {
+                            if (currentSlotIdx < 12) {
+                              slots[currentSlotIdx].booking = {
+                                ...booking,
+                                seatSubIndex: s + 1,
+                                totalSeats: requestedSeats
+                              };
+                              currentSlotIdx++;
+                            }
+                          }
+                        });
+
+                        // Рахуємо скільки місць зайнято
+                        const occupiedCount = runBookings.reduce((sum, b) => sum + (b.seats || 0), 0);
+                        const isExpanded = !!expandedRuns[run.time];
+                        const slotsToRender = isExpanded ? slots : slots.filter(s => s.booking !== null);
+
+                        return (
+                          <div key={run.time} className="space-y-3 bg-brand-dark/40 p-3 sm:p-4 rounded-xl border border-brand-border/40">
+                            <div className="bg-brand-dark px-3 sm:px-4 py-2.5 rounded-lg border border-brand-yellow/20 flex flex-col lg:flex-row justify-between items-stretch lg:items-center gap-3">
+                              <div className="flex items-center justify-between sm:justify-start gap-3 flex-wrap">
+                                <div className="flex items-center gap-3">
+                                  <span className="font-display font-black text-brand-yellow text-xl">{run.time}</span>
+                                  <span className="text-xs font-bold text-white bg-brand-surface border border-brand-border px-2 py-0.5 rounded uppercase">
+                                    {run.from} → {run.to}
+                                  </span>
+                                </div>
+                                
+                                <button
+                                  type="button"
+                                  onClick={() => openAddModalForRun(run.time, run.from, run.to)}
+                                  className="bg-brand-yellow/10 hover:bg-brand-yellow/20 text-brand-yellow border border-brand-yellow/20 hover:border-brand-yellow/40 text-[10px] font-bold px-2 py-1 rounded transition-all flex items-center gap-1 normal-case"
+                                >
+                                  <Plus size={11} className="text-brand-yellow" />
+                                  <span>Додати бронювання</span>
+                                </button>
+                              </div>
+                              <div className="text-[10px] sm:text-xs text-brand-muted uppercase font-bold flex items-center justify-between lg:justify-end gap-3 flex-wrap">
+                                <span>Екіпаж: <strong className="text-white">{activeTab}</strong></span>
+                                <span className="h-3 w-px bg-brand-border hidden sm:inline" />
+                                <span>Зайнято місць: <strong className={occupiedCount > 12 ? "text-red-500" : "text-brand-yellow"}>{occupiedCount}/12</strong></span>
+                                <span className="h-3 w-px bg-brand-border" />
+                                <button
+                                  type="button"
+                                  onClick={() => toggleRunExpanded(run.time)}
+                                  className="bg-brand-surface border border-brand-border hover:border-brand-yellow/50 text-[10px] text-white font-bold px-2 py-1 rounded transition-colors flex items-center justify-center gap-1 normal-case flex-1 lg:flex-initial animate-none"
+                                >
+                                  {isExpanded ? (
+                                    <>
+                                      <ChevronUp size={12} className="text-brand-yellow" />
+                                      <span>Згорнути</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <ChevronDown size={12} className="text-brand-yellow" />
+                                      <span>Розгорнути</span>
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+                          
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse">
+                              <thead className="text-brand-muted text-xs uppercase tracking-wider">
+                                <tr className="border-b border-brand-border">
+                                  <th className="px-4 py-2 font-medium w-12 text-center">Місце</th>
+                                  <th className="px-4 py-2 font-medium">Клієнт</th>
+                                  <th className="px-4 py-2 font-medium w-48">Маршрут</th>
+                                  <th className="px-4 py-2 font-medium w-40">Телефон</th>
+                                  <th className="px-4 py-2 font-medium">Зупинка посадки</th>
+                                  <th className="px-4 py-2 font-medium w-24 text-right">Дії</th>
+                                </tr>
+                              </thead>
+                              <tbody className="text-sm text-white divide-y divide-brand-border/30">
+                                {slotsToRender.length === 0 ? (
+                                  <tr>
+                                    <td colSpan={6} className="px-4 py-4 text-center text-brand-muted/60 italic text-xs">
+                                      Немає бронювань на цей рейс.{" "}
+                                      <button
+                                        type="button"
+                                        onClick={() => openAddModalForRun(run.time, run.from, run.to)}
+                                        className="text-brand-yellow hover:underline ml-1 font-bold inline-flex items-center gap-0.5"
+                                      >
+                                        <Plus size={10} />
+                                        <span>Додати перше бронювання</span>
+                                      </button>
+                                    </td>
+                                  </tr>
+                                ) : (
+                                  slotsToRender.map((slot) => {
+                                    const b = slot.booking;
+                                    if (b) {
+                                      return (
+                                        <tr key={`${b.id}-${slot.seatNumber}`} className="hover:bg-brand-yellow/5 transition-colors">
+                                          <td className="px-4 py-2.5 text-brand-yellow font-mono text-center font-bold">
+                                            {slot.seatNumber}
+                                          </td>
+                                          <td className="px-4 py-2.5 font-semibold">
+                                            {b.name} {b.totalSeats > 1 && (
+                                              <span className="text-xs text-brand-muted font-normal ml-1">
+                                                ({slot.seatNumber - slots.findIndex(s => s.booking?.id === b.id)}/{b.totalSeats})
+                                              </span>
+                                            )}
+                                          </td>
+                                          <td className="px-4 py-2.5 text-xs text-gray-300">
+                                            {b.from} → {b.to}
+                                          </td>
+                                          <td className="px-4 py-2.5 font-mono text-xs">
+                                            {b.phone}
+                                          </td>
+                                          <td className="px-4 py-2.5 text-xs text-brand-muted">
+                                            {b.pickup_location || '-'}
+                                          </td>
+                                          <td className="px-4 py-2.5 text-right">
+                                            <div className="flex items-center justify-end gap-1.5">
+                                              <a href={`tel:${b.phone}`} className="text-green-500 hover:text-green-400 p-1 rounded hover:bg-brand-surface transition-colors" title="Подзвонити">
+                                                <PhoneCall size={14} />
+                                              </a>
+                                              <button 
+                                                onClick={() => {
+                                                  const isoDate = formatDateToISO(b.date);
+                                                  setEditingBooking({...b, date: isoDate});
+                                                }}
+                                                className="text-brand-yellow hover:text-brand-gold p-1 rounded hover:bg-brand-surface transition-colors"
+                                                title="Редагувати"
+                                              >
+                                                <Edit2 size={14} />
+                                              </button>
+                                              <button 
+                                                onClick={() => handleDeleteBooking(b.id)}
+                                                className="text-red-500 hover:text-red-400 p-1 rounded hover:bg-brand-surface transition-colors"
+                                                title="Видалити"
+                                              >
+                                                <Trash2 size={14} />
+                                              </button>
+                                            </div>
+                                          </td>
+                                        </tr>
+                                      );
+                                    } else {
+                                      // Empty slot
+                                      return (
+                                        <tr key={`empty-${slot.seatNumber}`} className="text-brand-muted/50 hover:bg-brand-surface/30 transition-colors">
+                                          <td className="px-4 py-2 text-center font-mono text-brand-muted/40">
+                                            {slot.seatNumber}
+                                          </td>
+                                          <td className="px-4 py-2 italic text-xs">
+                                            <span className="text-emerald-500/40">Вільне місце</span>
+                                          </td>
+                                          <td className="px-4 py-2 text-xs">—</td>
+                                          <td className="px-4 py-2 font-mono text-xs">—</td>
+                                          <td className="px-4 py-2 text-xs">—</td>
+                                          <td className="px-4 py-2 text-right">
+                                            <button
+                                              type="button"
+                                              onClick={() => openAddModalForRun(run.time, run.from, run.to)}
+                                              className="text-brand-yellow hover:text-white p-1 rounded hover:bg-brand-yellow/10 transition-colors inline-flex items-center gap-1 text-xs font-bold"
+                                              title="Додати бронювання"
+                                            >
+                                              <Plus size={12} />
+                                              <span>Додати</span>
+                                            </button>
+                                          </td>
+                                        </tr>
+                                      );
+                                    }
+                                  })
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()
+            )}
           </div>
         </div>
       </div>
@@ -455,7 +858,7 @@ export default function DispatcherPanel({ onLogout }: { onLogout?: () => void })
                     <label className="label text-xs mb-1 block">Звідки</label>
                     <select 
                       value={newBooking.from}
-                      onChange={e => setNewBooking({...newBooking, from: e.target.value})}
+                      onChange={e => handleNewBookingRouteUpdate({ from: e.target.value })}
                       className="input-field h-11 bg-brand-surface"
                     >
                       {LOCATIONS.map(loc => <option key={loc} value={loc}>{loc}</option>)}
@@ -465,7 +868,7 @@ export default function DispatcherPanel({ onLogout }: { onLogout?: () => void })
                     <label className="label text-xs mb-1 block">Куди</label>
                     <select 
                       value={newBooking.to}
-                      onChange={e => setNewBooking({...newBooking, to: e.target.value})}
+                      onChange={e => handleNewBookingRouteUpdate({ to: e.target.value })}
                       className="input-field h-11 bg-brand-surface"
                     >
                       {LOCATIONS.map(loc => <option key={loc} value={loc}>{loc}</option>)}
@@ -491,7 +894,7 @@ export default function DispatcherPanel({ onLogout }: { onLogout?: () => void })
                       onChange={e => setNewBooking({...newBooking, departure_time: e.target.value})}
                       className="input-field h-11 bg-brand-surface"
                     >
-                      {VALID_TIMES.map(t => <option key={t} value={t}>{t}</option>)}
+                      {getValidTimesForRoute(newBooking.from, newBooking.to).map(t => <option key={t} value={t}>{t}</option>)}
                     </select>
                   </div>
                 </div>
@@ -524,11 +927,17 @@ export default function DispatcherPanel({ onLogout }: { onLogout?: () => void })
                   <label className="label text-xs mb-1 block">Зупинка посадки</label>
                   <input 
                     type="text" 
+                    list="new-booking-pickup-list"
                     value={newBooking.pickup_location}
                     onChange={e => setNewBooking({...newBooking, pickup_location: e.target.value})}
                     className="input-field h-11"
-                    placeholder="Напр. Готель Тустань"
+                    placeholder="Оберіть зі списку або введіть довільно"
                   />
+                  <datalist id="new-booking-pickup-list">
+                    {(STATION_PICKUP_LOCATIONS[CITY_KEYS[newBooking.from]] || []).map((loc) => (
+                      <option key={loc} value={loc} />
+                    ))}
+                  </datalist>
                 </div>
 
                 <button type="submit" className="btn-primary w-full py-3 text-dark font-bold shadow-brand mt-2">
@@ -585,7 +994,7 @@ export default function DispatcherPanel({ onLogout }: { onLogout?: () => void })
                     <label className="label text-xs mb-1 block">Звідки</label>
                     <select 
                       value={editingBooking.from}
-                      onChange={e => setEditingBooking({...editingBooking, from: e.target.value})}
+                      onChange={e => handleEditingBookingRouteUpdate({ from: e.target.value })}
                       className="input-field h-11 bg-brand-surface"
                     >
                       {LOCATIONS.map(loc => <option key={loc} value={loc}>{loc}</option>)}
@@ -595,7 +1004,7 @@ export default function DispatcherPanel({ onLogout }: { onLogout?: () => void })
                     <label className="label text-xs mb-1 block">Куди</label>
                     <select 
                       value={editingBooking.to}
-                      onChange={e => setEditingBooking({...editingBooking, to: e.target.value})}
+                      onChange={e => handleEditingBookingRouteUpdate({ to: e.target.value })}
                       className="input-field h-11 bg-brand-surface"
                     >
                       {LOCATIONS.map(loc => <option key={loc} value={loc}>{loc}</option>)}
@@ -621,7 +1030,7 @@ export default function DispatcherPanel({ onLogout }: { onLogout?: () => void })
                       onChange={e => setEditingBooking({...editingBooking, departure_time: e.target.value})}
                       className="input-field h-11 bg-brand-surface"
                     >
-                      {VALID_TIMES.map(t => <option key={t} value={t}>{t}</option>)}
+                      {getValidTimesForRoute(editingBooking.from, editingBooking.to).map(t => <option key={t} value={t}>{t}</option>)}
                     </select>
                   </div>
                 </div>
@@ -654,10 +1063,17 @@ export default function DispatcherPanel({ onLogout }: { onLogout?: () => void })
                   <label className="label text-xs mb-1 block">Зупинка посадки</label>
                   <input 
                     type="text" 
+                    list="edit-booking-pickup-list"
                     value={editingBooking.pickup_location || ''}
                     onChange={e => setEditingBooking({...editingBooking, pickup_location: e.target.value})}
                     className="input-field h-11"
+                    placeholder="Оберіть зі списку або введіть довільно"
                   />
+                  <datalist id="edit-booking-pickup-list">
+                    {(STATION_PICKUP_LOCATIONS[CITY_KEYS[editingBooking.from]] || []).map((loc) => (
+                      <option key={loc} value={loc} />
+                    ))}
+                  </datalist>
                 </div>
 
                 <button type="submit" className="btn-primary w-full py-3 text-dark font-bold shadow-brand mt-2">
@@ -711,11 +1127,14 @@ function DriversSubPanel({ selectedDateUA }: DriversSubPanelProps) {
   }, [selectedDateUA]);
 
   const handlePhoneChange = (val: string) => {
-    if (!val.startsWith('+380')) {
-      setNewDriverPhone('+380');
+    const prefix = '+380';
+    if (!val.startsWith(prefix)) {
+      setNewDriverPhone(prefix);
       return;
     }
-    setNewDriverPhone(val);
+    const suffix = val.substring(prefix.length).replace(/\D/g, '');
+    const limitedSuffix = suffix.substring(0, 9);
+    setNewDriverPhone(prefix + limitedSuffix);
   };
 
   const handleAddDriver = async (e: React.FormEvent) => {
@@ -757,10 +1176,22 @@ function DriversSubPanel({ selectedDateUA }: DriversSubPanelProps) {
     }
   };
 
+  const CARS_LIST = [
+    'нс 0700 мо',
+    'вс 1070 хв',
+    'вс 0777 оі',
+    'вс 1060 хв',
+    'вс 1030 хв',
+    'вс 1080 хв'
+  ];
+
   const handleAssignChange = async (crew: string, driverId: string) => {
     setSavingCrews(prev => ({ ...prev, [crew]: true }));
     try {
-      await driverService.assignDriver(driverId ? driverId : null, crew, selectedDateUA);
+      const assignment = assignments.find(a => a.crew === crew);
+      const currentCar = assignment ? (assignment.car || null) : null;
+      
+      await driverService.assignDriver(driverId ? driverId : null, currentCar, crew, selectedDateUA);
       const updatedAssignments = await driverService.getAssignments(selectedDateUA);
       setAssignments(updatedAssignments);
     } catch (err) {
@@ -771,7 +1202,24 @@ function DriversSubPanel({ selectedDateUA }: DriversSubPanelProps) {
     }
   };
 
-  const ACTIVE_CREWS = ['05:50', '06:20', '07:10', '08:50', '09:30', '10:35', '12:40'];
+  const handleCarChange = async (crew: string, car: string) => {
+    setSavingCrews(prev => ({ ...prev, [crew]: true }));
+    try {
+      const assignment = assignments.find(a => a.crew === crew);
+      const currentDriverId = assignment ? (assignment.driver_id || null) : null;
+      
+      await driverService.assignDriver(currentDriverId, car ? car : null, crew, selectedDateUA);
+      const updatedAssignments = await driverService.getAssignments(selectedDateUA);
+      setAssignments(updatedAssignments);
+    } catch (err) {
+      console.error(err);
+      alert('Помилка при призначенні авто.');
+    } finally {
+      setSavingCrews(prev => ({ ...prev, [crew]: false }));
+    }
+  };
+
+  const ACTIVE_CREWS = ['06:20', '07:10', '08:15', '09:30', '10:35', '11:10'];
 
   return (
     <div className="space-y-8 text-white">
@@ -796,6 +1244,7 @@ function DriversSubPanel({ selectedDateUA }: DriversSubPanelProps) {
               {ACTIVE_CREWS.map(crew => {
                 const assignment = assignments.find(a => a.crew === crew);
                 const currentDriverId = assignment ? assignment.driver_id : '';
+                const currentCar = assignment ? (assignment.car || '') : '';
                 const isSaving = savingCrews[crew];
 
                 return (
@@ -805,25 +1254,40 @@ function DriversSubPanel({ selectedDateUA }: DriversSubPanelProps) {
                       <div className="text-xs text-brand-muted uppercase font-bold">Екіпаж</div>
                     </div>
 
-                    <div className="flex items-center gap-2 min-w-[200px]">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 min-w-[200px] sm:min-w-[320px]">
                       {isSaving ? (
                         <RefreshCw size={16} className="animate-spin text-brand-yellow mr-2" />
-                      ) : currentDriverId ? (
-                        <span className="text-green-500 text-xs font-bold mr-1">✓ Призначено</span>
+                      ) : (currentDriverId || currentCar) ? (
+                        <span className="text-green-500 text-xs font-bold mr-1 whitespace-nowrap">✓ Призначено</span>
                       ) : null}
                       
-                      <select
-                        value={currentDriverId}
-                        onChange={(e) => handleAssignChange(crew, e.target.value)}
-                        className="bg-brand-dark border border-brand-border rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-brand-yellow w-full"
-                      >
-                        <option value="">-- Не призначено --</option>
-                        {drivers.map(d => (
-                          <option key={d.id} value={d.id}>
-                            {d.name} ({d.pin_code})
-                          </option>
-                        ))}
-                      </select>
+                      <div className="flex gap-2 w-full">
+                        <select
+                          value={currentDriverId}
+                          onChange={(e) => handleAssignChange(crew, e.target.value)}
+                          className="bg-brand-dark border border-brand-border rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-brand-yellow w-1/2"
+                        >
+                          <option value="">-- Водій --</option>
+                          {drivers.map(d => (
+                            <option key={d.id} value={d.id}>
+                              {d.name}
+                            </option>
+                          ))}
+                        </select>
+
+                        <select
+                          value={currentCar}
+                          onChange={(e) => handleCarChange(crew, e.target.value)}
+                          className="bg-brand-dark border border-brand-border rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-brand-yellow w-1/2"
+                        >
+                          <option value="">-- Машина --</option>
+                          {CARS_LIST.map(car => (
+                            <option key={car} value={car}>
+                              {car}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
                   </div>
                 );

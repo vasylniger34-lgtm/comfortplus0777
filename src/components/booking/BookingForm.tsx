@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { User, Phone, ArrowRight, X, ChevronRight, CheckCircle2, Loader2, AlertCircle, ChevronDown, MapPin, Map } from 'lucide-react';
 import { getPrice, CONTACTS } from '../../data/routes';
 import { useAuth } from '../../context/AuthContext';
+import { apiClient } from '../../lib/apiClient';
 
 import DatePicker from './DatePicker';
 
@@ -40,6 +41,7 @@ const ROUTE_SKHIDNYTSIA_TO_LVIV = [
 
 export const PICKUP_LOCATIONS: Record<string, {name: string, link: string}[]> = {
   skhidnytsia: [
+    { name: 'ЗАБРАТИ З ГОТЕЛЮ', link: '' },
     { name: 'Готель Тустань', link: 'https://maps.app.goo.gl/9S5Fj2L5Sg9qL2Yw8' },
     { name: 'Ринок', link: 'https://maps.app.goo.gl/Z9JqR5G6H6v8F2fA9' },
     { name: 'Київська Русь', link: 'https://maps.app.goo.gl/vS8D9L2L6f5R3G7A8' },
@@ -54,6 +56,7 @@ export const PICKUP_LOCATIONS: Record<string, {name: string, link: string}[]> = 
     { name: 'Центр. Нова пошта 1', link: 'https://maps.app.goo.gl/v7G3M1S5R2G4B8A9L' }
   ],
   truskavets: [
+    { name: 'ЗАБРАТИ З ГОТЕЛЮ', link: '' },
     { name: 'Вишенька. Лісова пісня', link: 'https://maps.app.goo.gl/v1G4L2S5M8R3G6B9A' },
     { name: 'Автовокзал', link: 'https://maps.app.goo.gl/v9M5L1S2R3G4B7A8L' },
     { name: 'Церква св. Іллі. Поліція', link: 'https://maps.app.goo.gl/v5G3M1S8R2G4B9A7L' },
@@ -71,23 +74,6 @@ export const PICKUP_LOCATIONS: Record<string, {name: string, link: string}[]> = 
     { name: 'ТЦ Victoria Gardens Автосалон Toyota', link: '' }
   ]
 };
-
-// Custom Sprinter Taxi Icon
-function SprinterTaxiIcon({ className }: { className?: string }) {
-  return (
-    <div className={`relative flex flex-col items-center ${className}`}>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-10 h-7 text-brand-yellow">
-        {/* Van body */}
-        <path d="M2 17h20v-4l-3-4H7l-3 4v4z" />
-        <path d="M7 9V7a1 1 0 011-1h8a1 1 0 011 1v2" />
-        <rect x="8" y="10" width="8" height="3" fill="currentColor" fillOpacity="0.2" />
-        <circle cx="7" cy="17" r="2" />
-        <circle cx="17" cy="17" r="2" />
-      </svg>
-      <div className="bg-brand-yellow text-brand-dark text-[9px] font-black px-1.5 py-0.5 rounded-sm -mt-0.5 tracking-tighter uppercase shadow-sm">таксі</div>
-    </div>
-  );
-}
 
 function CallUsModal({ onClose }: { onClose: () => void }) {
   return (
@@ -131,6 +117,38 @@ function CallUsModal({ onClose }: { onClose: () => void }) {
   );
 }
 
+// Мапінг часу до екіпажу
+const getCrewByTime = (time: string, isLvivDeparture: boolean) => {
+  if (isLvivDeparture) {
+    const mapping: Record<string, string> = {
+      '09:00': '06:20', '14:50': '06:20', // Crew 1
+      '10:15': '07:10', '16:10': '07:10', // Crew 2
+      '11:10': '08:15', '18:20': '08:15', // Crew 3
+      '12:20': '09:30', '19:20': '09:30', // Crew 4
+      '13:10': '10:35', '20:00': '10:35', // Crew 5
+      '14:10': '11:10', '20:40': '11:10', // Crew 6
+    };
+    return mapping[time] || '';
+  } else {
+    const mapping: Record<string, string> = {
+      '06:20': '06:20', '12:00': '06:20', // Crew 1
+      '07:10': '07:10', '13:20': '07:10', // Crew 2
+      '08:15': '08:15', '15:30': '08:15', // Crew 3
+      '09:30': '09:30', '16:20': '09:30', // Crew 4
+      '10:35': '10:35', '17:00': '10:35', // Crew 5
+      '11:10': '11:10', '17:40': '11:10', // Crew 6
+    };
+    return mapping[time] || '';
+  }
+};
+
+const getUADateString = (dateObj: Date) => {
+  const d = String(dateObj.getDate()).padStart(2, '0');
+  const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const y = dateObj.getFullYear();
+  return `${d}.${m}.${y}`;
+};
+
 export default function BookingForm({ onPay }: BookingFormProps) {
   const { user } = useAuth();
   
@@ -143,20 +161,14 @@ export default function BookingForm({ onPay }: BookingFormProps) {
   const [seats, setSeats] = useState(1);
   const [selectedTime, setSelectedTime] = useState('');
   const [pickupLocation, setPickupLocation] = useState('');
+  const [dropoffLocation, setDropoffLocation] = useState('');
   const [isPickupDropdownOpen, setIsPickupDropdownOpen] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showCallModal, setShowCallModal] = useState(false);
-  const [showAllCrews, setShowAllCrews] = useState(true);
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [statusMessage, setStatusMessage] = useState('');
-
-  // Availability from Google Sheets
-  const [availability, setAvailability] = useState<Record<string, any[]>>({});
-  const [isLoadingAvailability, setIsLoadingAvailability] = useState(false);
-
-  const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxd8ZIMLZdgaOKw7YBmbTK72mCUvy8rmRcOUvqQ2W3vZifJy3wTVbh_q-ikWL1FarXk/exec';
 
   const price = getPrice(from, to);
   const currentRoute = directionIndex === 0 ? ROUTE_LVIV_TO_SKHIDNYTSIA : ROUTE_SKHIDNYTSIA_TO_LVIV;
@@ -168,59 +180,13 @@ export default function BookingForm({ onPay }: BookingFormProps) {
     }
   }, [user]);
 
-  // Fetch availability when date changes
-  useEffect(() => {
-    if (date) {
-      fetchAvailability();
-    }
-  }, [date]);
-
-  const fetchAvailability = async () => {
-    setIsLoadingAvailability(true);
-    try {
-      const res = await fetch(SCRIPT_URL);
-      const data = await res.json();
-      setAvailability(data);
-    } catch (err) {
-      console.error('Failed to fetch availability:', err);
-    } finally {
-      setIsLoadingAvailability(false);
-    }
-  };
-
-  // 6 crews, each alternating Східниця→Львів and Львів→Східниця throughout the day
-  // Structure: crewNumber → { skhidnytsia_lviv: times[], lviv_skhidnytsia: times[] }
-  const CREWS = [
-    { name: 'Екіпаж №1', skhidnytsia_lviv: ['05:50', '10:35', '15:30'], lviv_skhidnytsia: ['08:10', '13:10', '19:20'] },
-    { name: 'Екіпаж №2', skhidnytsia_lviv: ['06:20', '11:10', '16:20'], lviv_skhidnytsia: ['09:00', '14:10', '20:00'] },
-    { name: 'Екіпаж №3', skhidnytsia_lviv: ['07:10', '12:40', '17:00'], lviv_skhidnytsia: ['10:15', '15:30', '20:40'] },
-    { name: 'Екіпаж №4', skhidnytsia_lviv: ['08:10', '13:20', '17:40'], lviv_skhidnytsia: ['11:05', '16:10'] },
-    { name: 'Екіпаж №5', skhidnytsia_lviv: ['08:50', '14:10'],           lviv_skhidnytsia: ['11:50', '18:20'] },
-    { name: 'Екіпаж №6', skhidnytsia_lviv: ['09:30', '12:00'],           lviv_skhidnytsia: ['12:20', '14:50'] },
+  const TIMES_LVIV_TO_SKHIDNYTSIA = [
+    '09:00', '10:15', '11:10', '12:20', '13:10', '14:10', '14:50', '16:10', '18:20', '19:20', '20:00', '20:40'
   ];
-
-  // Get departure times for the selected direction
-  const getTimesForDirection = () => {
-    if (directionIndex === null) return [];
-    const key = directionIndex === 0 ? 'lviv_skhidnytsia' : 'skhidnytsia_lviv';
-    const entries: { time: string; crewName: string }[] = [];
-    CREWS.forEach(crew => {
-      crew[key].forEach(time => {
-        entries.push({ time, crewName: crew.name });
-      });
-    });
-    // Sort by time
-    entries.sort((a, b) => a.time.localeCompare(b.time));
-    return entries;
-  };
-
-  const availableDepartures = getTimesForDirection();
-
-  // Get crew name for a given time
-  const getCrewName = (time: string) => {
-    const entry = availableDepartures.find(e => e.time === time);
-    return entry?.crewName || `Екіпаж №${time.replace(':', '')}`;
-  };
+  const TIMES_SKHIDNYTSIA_TO_LVIV = [
+    '06:20', '07:10', '08:15', '09:30', '10:35', '11:10', '12:00', '13:20', '15:30', '16:20', '17:00', '17:40'
+  ];
+  const departureTimes = directionIndex === 0 ? TIMES_LVIV_TO_SKHIDNYTSIA : TIMES_SKHIDNYTSIA_TO_LVIV;
 
   const isTimePassed = (time: string) => {
     if (!date) return false;
@@ -239,13 +205,13 @@ export default function BookingForm({ onPay }: BookingFormProps) {
       setTo('');
       setSelectedTime('');
       setPickupLocation('');
+      setDropoffLocation('');
     } else {
       const fromIdx = currentRoute.findIndex(s => s.id === from);
       const toIdx = currentRoute.findIndex(s => s.id === stopId);
       
       if (toIdx > fromIdx) {
         setTo(stopId);
-        // Перевірка на короткий маршрут (тільки за телефоном)
         const isShort = from !== 'lviv' && stopId !== 'lviv';
         if (isShort) setShowCallModal(true);
       } else {
@@ -253,6 +219,7 @@ export default function BookingForm({ onPay }: BookingFormProps) {
         setTo('');
         setSelectedTime('');
         setPickupLocation('');
+        setDropoffLocation('');
       }
     }
   };
@@ -275,6 +242,9 @@ export default function BookingForm({ onPay }: BookingFormProps) {
     if (!date) errs.date = "Оберіть дату";
     if (!selectedTime) errs.time = "Оберіть час";
     if (selectedTime && !pickupLocation) errs.pickupLocation = "Оберіть зупинку для посадки";
+    if (selectedTime && (to === 'skhidnytsia' || to === 'truskavets') && !dropoffLocation) {
+      errs.dropoffLocation = "Оберіть зупинку для висадки";
+    }
     if (!name.trim() || name.trim().length < 2) errs.name = "Введіть ім'я";
     const phoneDigits = phone.replace(/\D/g, '');
     if (phoneDigits.length < 12) errs.phone = "Введіть коректний номер";
@@ -285,13 +255,6 @@ export default function BookingForm({ onPay }: BookingFormProps) {
     e.preventDefault();
     
     const isShortTrip = (from !== 'lviv' && to !== 'lviv');
-    const isForbidden = (price === 0);
-
-    if (isForbidden && from && to) {
-        setErrors({ route: "Даний маршрут недоступний для бронювання." });
-        return;
-    }
-
     if (isShortTrip && from !== '') {
         setShowCallModal(true);
         return;
@@ -304,48 +267,96 @@ export default function BookingForm({ onPay }: BookingFormProps) {
     }
     setErrors({});
     
-    const payload = {
-      from: currentRoute.find(s=>s.id===from)?.name || from,
-      to: currentRoute.find(s=>s.id===to)?.name || to,
-      date: date?.toLocaleDateString('uk-UA'),
-      name,
-      phone,
-      seats,
-      departureTime: selectedTime,
-      price: price * seats
-    };
+    setIsSubmitting(true);
+    try {
+      const payloadPickupLoc = dropoffLocation 
+        ? `${pickupLocation} (Висадка: ${dropoffLocation})`
+        : pickupLocation;
 
-    // Open payment modal immediately
-    onPay({ from, to, pickupLocation, date: date!, name, phone, price: price * seats, seats, departureTime: selectedTime });
+      const payload = {
+        from: currentRoute.find(s=>s.id===from)?.name || from,
+        to: currentRoute.find(s=>s.id===to)?.name || to,
+        pickup_location: payloadPickupLoc,
+        date: date ? getUADateString(date) : '',
+        name,
+        phone,
+        seats,
+        departure_time: selectedTime,
+        price: price * seats,
+        status: 'active',
+        crew: getCrewByTime(selectedTime, directionIndex === 0)
+      };
+
+      // Відправка в API
+      await apiClient.createBooking(payload);
+
+      // Відправка в Telegram
+      try {
+        const botToken = '8615069227:AAEiCjdj66e469JqarZxWSlfzFQs1jGkr4M';
+        const ADMIN_CHAT_IDS = ['8472692319', '8618558820'];
+        
+        const isHotelPickup = pickupLocation === 'ЗАБРАТИ З ГОТЕЛЮ';
+        const isHotelDropoff = dropoffLocation === 'ДОСТАВИТИ ДО ГОТЕЛЮ';
+        const isHotelTrip = isHotelPickup || isHotelDropoff;
+
+        const adminText = `🔔 Нове бронювання на сайті!\n\n👤 Клієнт: ${name}\n📞 Телефон: ${phone}\nМаршрут: ${payload.from} → ${payload.to}\n🚏 Зупинка посадки: ${pickupLocation}\n🚏 Зупинка висадки: ${dropoffLocation || 'Стандартна'}\n📅 Дата: ${payload.date}\n🕒 Час: ${selectedTime}\n👥 Місць: ${seats}\n💰 Сума: ${price * seats} грн${isHotelTrip ? ' (+ додаткова оплата за готель)' : ''}`;
+        
+        for (const adminId of ADMIN_CHAT_IDS) {
+          fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              chat_id: adminId,
+              text: adminText
+            })
+          });
+        }
+
+        // Окремий ордер для готелю
+        if (isHotelTrip) {
+          const hotelText = `🏨 УВАГА! ТРЕБА ПЕРЕТЕЛЕФОНУВАТИ! Забір/доставка з готелю\n\n👤 Клієнт: ${name}\n📞 Телефон: ${phone}\nМаршрут: ${payload.from} → ${payload.to}\n🚏 Зупинка посадки: ${pickupLocation}\n🚏 Зупинка висадки: ${dropoffLocation || '-'}\n📅 Дата: ${payload.date}\n🕒 Час: ${selectedTime}\n👥 Місць: ${seats}\n💰 Сума: ${price * seats} грн\n\n⚠️ Клієнт забронював рейс з ${isHotelPickup && isHotelDropoff ? 'забору з готелю та доставки в готель' : isHotelPickup ? 'забору з готелю' : 'доставки в готель'}. Треба перетелефонувати й узгодити ціну!`;
+          
+          for (const adminId of ADMIN_CHAT_IDS) {
+            fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                chat_id: adminId,
+                text: hotelText
+              })
+            });
+          }
+        }
+      } catch (e) {
+        console.error('Telegram error', e);
+      }
+
+      setSubmitStatus('success');
+      setStatusMessage('Дякуємо! Ваша заявка прийнята. Оскільки онлайн-оплата тимчасово недоступна, будь ласка, зателефонуйте нам для підтвердження броні.');
+
+    } catch (error) {
+      console.error('Supabase Error:', error);
+      setSubmitStatus('error');
+      setStatusMessage('Сталася помилка при збереженні. Спробуйте ще раз або зателефонуйте нам.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const AvailabilityCard = ({ time, isVisible }: { time: string; isVisible: boolean }) => {
+  const AvailabilityCard = ({ time }: { time: string }) => {
     const passed = isTimePassed(time);
     if (passed) return null;
-    
     const isSelected = selectedTime === time;
-    const timeData = availability[time] || [];
-    const freeSeats = timeData.length > 0 ? timeData.filter(s => !s.name).length : 12;
-    
-    // Hide crew if no free seats
-    if (freeSeats === 0) return null;
-    
-    // If a crew is selected — only show the selected one unless expanded
-    if (!isVisible && !isSelected) return null;
+    const seatsLeft = 8; // Заглушка
 
     return (
-      <motion.button
+      <button
         type="button"
-        layout
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -10, height: 0, marginBottom: 0 }}
-        transition={{ duration: 0.3 }}
-        onClick={() => { 
-          setSelectedTime(isSelected ? '' : time); 
-          setShowAllCrews(isSelected); 
-          setErrors(e => ({ ...e, time: '' })); 
-        }}
+        onClick={() => { setSelectedTime(time); setErrors(e => ({ ...e, time: '' })); }}
         className={`relative flex items-center justify-between p-5 rounded-2xl border transition-all duration-200 text-left w-full
           ${isSelected 
             ? 'bg-brand-yellow text-brand-dark border-brand-yellow shadow-brand scale-[1.01]' 
@@ -354,29 +365,27 @@ export default function BookingForm({ onPay }: BookingFormProps) {
         `}
       >
         <div className="flex items-center gap-6">
-            <div className={`p-1 rounded-xl flex items-center justify-center ${isSelected ? 'bg-brand-dark/10' : 'text-brand-yellow'}`}>
-              <SprinterTaxiIcon />
+            <div className={`p-3 rounded-xl flex items-center justify-center ${isSelected ? 'bg-brand-dark/10' : 'bg-brand-yellow/10 text-brand-yellow'}`}>
+              <MapPin size={24} />
             </div>
             <div className="flex flex-col">
                 <div className="flex items-center gap-2 mb-1">
                     <span className="text-2xl font-display font-black">~{time}</span>
                     <span className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded ${isSelected ? 'bg-brand-dark/10 opacity-70' : 'bg-brand-yellow/10 text-brand-yellow'}`}>
-                        {getCrewName(time)}
+                        Екіпаж №{time.replace(':', '')}
                     </span>
                 </div>
                 <div className={`text-xs font-medium flex items-center gap-1.5 ${isSelected ? 'text-brand-dark/80' : 'text-brand-muted'}`}>
-                   Орієнтовний час готовності <span className="opacity-40">•</span> <User size={12} className="inline mr-0.5" />{freeSeats} місць
+                   Орієнтовний час готовності <span className="opacity-40">•</span> <User size={12} className="inline mr-0.5" />{seatsLeft} місць
                 </div>
             </div>
         </div>
         <div className="flex items-center gap-4">
             <div className="text-right hidden sm:block">
-                <div className={`text-[10px] uppercase font-black tracking-tighter ${isSelected ? 'text-brand-dark/60' : freeSeats <= 3 ? 'text-orange-400' : 'text-green-500'}`}>
-                  {isSelected ? 'Обрано' : freeSeats <= 3 ? 'Мало місць' : 'Статус: Вільний'}
-                </div>
+                <div className={`text-[10px] uppercase font-black tracking-tighter ${isSelected ? 'text-brand-dark/60' : 'text-green-500'}`}>Статус: Вільний</div>
                 <div className={`text-xs font-bold ${isSelected ? 'text-brand-dark' : 'text-white'}`}>Готовий до виїзду</div>
             </div>
-            <div className={`w-3 h-3 rounded-full pulse ${isSelected ? 'bg-brand-dark' : freeSeats <= 3 ? 'bg-orange-400' : 'bg-green-500'}`} />
+            <div className={`w-3 h-3 rounded-full pulse ${isSelected ? 'bg-brand-dark' : 'bg-green-500'}`} />
         </div>
         {isSelected && (
           <div className="absolute -top-2 -right-2 transform transition-transform">
@@ -385,15 +394,13 @@ export default function BookingForm({ onPay }: BookingFormProps) {
              </div>
           </div>
         )}
-      </motion.button>
+      </button>
     );
   };
 
-  const isForbidden = from && to && price === 0;
-
   return (
     <section id="booking" className="max-w-6xl mx-auto px-4 py-16">
-      <AnimatePresence>{showCallModal && <CallUsModal onClose={() => setShowCallModal(false)} />}</AnimatePresence>
+      <AnimatePresence>{showCallModal && <CallUsModal onClose={() => { setShowCallModal(false); setFrom(''); setTo(''); }} />}</AnimatePresence>
 
       <motion.div
         initial={{ opacity: 0, y: 30 }}
@@ -406,51 +413,259 @@ export default function BookingForm({ onPay }: BookingFormProps) {
           <motion.div 
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="card p-12 text-center space-y-6 border-green-500/30"
+            className="card p-12 text-center space-y-6 border-brand-yellow/30"
           >
-             <div className="w-20 h-20 bg-green-500/10 rounded-full flex items-center justify-center mx-auto text-green-500">
+             <div className="w-20 h-20 bg-brand-yellow/10 rounded-full flex items-center justify-center mx-auto text-brand-yellow">
                 <CheckCircle2 size={48} />
              </div>
-             <h2 className="text-3xl font-display font-black text-white">Успішно заброньовано!</h2>
-             <p className="text-brand-muted max-w-sm mx-auto">{statusMessage}</p>
+             <h2 className="text-3xl font-display font-black text-white">Заявка прийнята!</h2>
+             <p className="text-brand-muted max-w-md mx-auto text-lg">{statusMessage}</p>
+             
+             <div className="grid sm:grid-cols-2 gap-4 max-w-2xl mx-auto mt-6">
+               <a href={`tel:${CONTACTS.phone1}`} className="btn-primary p-4 flex items-center justify-center gap-3 text-dark font-black text-lg shadow-brand">
+                 <Phone size={20} />
+                 {CONTACTS.phone1Display}
+               </a>
+               <a href={`tel:${CONTACTS.phone2}`} className="btn-primary p-4 flex items-center justify-center gap-3 text-dark font-black text-lg shadow-brand">
+                 <Phone size={20} />
+                 {CONTACTS.phone2Display}
+               </a>
+             </div>
+             
              <button 
                onClick={() => setSubmitStatus('idle')}
-               className="btn-primary px-8 py-3 mx-auto flex items-center justify-center gap-2"
+               className="text-brand-muted hover:text-white underline text-sm mt-4"
              >
-                Повернутись назад
+                Повернутись до форми
              </button>
           </motion.div>
         ) : (
-          <div className="card p-8 md:p-12 text-center space-y-8 border-brand-yellow/30 relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-brand-yellow to-transparent opacity-50"></div>
-            
-            <div className="w-24 h-24 bg-brand-yellow/10 rounded-full flex items-center justify-center mx-auto text-brand-yellow shadow-lg shadow-brand-yellow/5">
-               <AlertCircle size={56} />
+          <form onSubmit={handleSubmit} className="card p-6 md:p-8 space-y-12 relative overflow-hidden">
+            {isSubmitting && (
+              <div className="absolute inset-0 z-50 bg-brand-dark/60 backdrop-blur-sm flex flex-col items-center justify-center space-y-4">
+                  <Loader2 size={48} className="text-brand-yellow animate-spin" />
+                  <p className="text-brand-yellow font-bold animate-pulse text-center px-4">Зберігаємо вашу заявку...</p>
+              </div>
+            )}
+
+            {/* STEP 1: DIRECTION */}
+            <div>
+              <h3 className="section-title text-2xl mb-6 flex items-center gap-3">
+                <span className="w-8 h-8 rounded-full bg-brand-yellow text-brand-dark flex items-center justify-center text-sm font-black">1</span>
+                Оберіть напрямок
+              </h3>
+              <div className="grid sm:grid-cols-2 gap-4">
+                {[
+                  { id: 0, label: 'Львів → Східниця', desc: 'Через Стебник, Трускавець, Борислав' },
+                  { id: 1, label: 'Східниця → Львів', desc: 'Через Борислав, Трускавець, Стебник' }
+                ].map((dir) => (
+                  <button
+                    key={dir.id}
+                    type="button"
+                    onClick={() => { setDirectionIndex(dir.id); setFrom(''); setTo(''); setPickupLocation(''); setDropoffLocation(''); }}
+                    className={`p-6 rounded-2xl border-2 transition-all text-left group
+                      ${directionIndex === dir.id ? 'border-brand-yellow bg-brand-yellow/5' : 'border-brand-border hover:border-brand-yellow/40'}
+                    `}
+                  >
+                    <div className="flex justify-between items-center mb-2">
+                        <span className={`font-display font-black text-xl ${directionIndex === dir.id ? 'text-brand-yellow' : 'text-white'}`}>{dir.label}</span>
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${directionIndex === dir.id ? 'border-brand-yellow' : 'border-brand-border'}`}>
+                          {directionIndex === dir.id && <div className="w-2.5 h-2.5 rounded-full bg-brand-yellow" />}
+                        </div>
+                    </div>
+                    <p className="text-sm text-brand-muted">{dir.desc}</p>
+                  </button>
+                ))}
+              </div>
             </div>
-            
-            <div className="space-y-4">
-              <h2 className="text-3xl md:text-4xl font-display font-black text-white">Онлайн-бронювання тимчасово недоступне</h2>
-              <p className="text-brand-muted max-w-lg mx-auto text-lg leading-relaxed">
-                Ми наразі налаштовуємо платіжну систему для вашої зручності. 
-                <span className="block mt-2 text-brand-yellow font-bold">Будь ласка, забронюйте поїздку за телефоном:</span>
-              </p>
-            </div>
-            
-            <div className="grid sm:grid-cols-2 gap-4 max-w-2xl mx-auto">
-              <a href={`tel:${CONTACTS.phone1}`} className="btn-primary p-5 flex items-center justify-center gap-3 text-dark font-black text-xl hover:scale-[1.02] transition-transform shadow-brand">
-                <Phone size={24} />
-                {CONTACTS.phone1Display}
-              </a>
-              <a href={`tel:${CONTACTS.phone2}`} className="btn-primary p-5 flex items-center justify-center gap-3 text-dark font-black text-xl hover:scale-[1.02] transition-transform shadow-brand">
-                <Phone size={24} />
-                {CONTACTS.phone2Display}
-              </a>
-            </div>
-            
-            <div className="pt-6 border-t border-brand-border/50">
-              <p className="text-brand-muted text-sm uppercase tracking-widest font-bold">Дякуємо за розуміння!</p>
-            </div>
-          </div>
+
+            {/* STEP 2: STOPS */}
+            <AnimatePresence>
+              {directionIndex !== null && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="overflow-hidden"
+                >
+                  <h3 className="section-title text-2xl mb-8 flex items-center gap-3 pt-4 border-t border-brand-border">
+                    <span className="w-8 h-8 rounded-full bg-brand-yellow text-brand-dark flex items-center justify-center text-sm font-black">2</span>
+                    Оберіть маршрут (два кліки)
+                  </h3>
+                  
+                  <div className="relative pb-12">
+                    <div className="absolute left-4 right-4 h-1 bg-brand-border top-5 -z-10" />
+                    
+                    <div className="flex justify-between items-start">
+                      {currentRoute.map((stop, idx) => {
+                        const isFrom = from === stop.id;
+                        const isTo = to === stop.id;
+                        const isIntermediate = from && to && 
+                            currentRoute.findIndex(s => s.id === from) < idx && 
+                            currentRoute.findIndex(s => s.id === to) > idx;
+
+                        return (
+                          <div key={stop.id} className="flex flex-col items-center group w-full">
+                            <button
+                              type="button"
+                              onClick={() => handleStopSelect(stop.id)}
+                              className={`relative w-10 h-10 rounded-full border-4 flex items-center justify-center transition-all duration-300
+                                  ${isFrom || isTo ? 'bg-brand-yellow border-brand-yellow scale-125 shadow-brand' : 'bg-brand-dark border-brand-border group-hover:border-brand-yellow/50'}
+                                  ${isIntermediate ? 'border-brand-yellow/60' : ''}
+                              `}
+                            >
+                              {isFrom && <span className="text-brand-dark text-[10px] font-black italic">ЗВІДКИ</span>}
+                              {isTo && <span className="text-brand-dark text-[10px] font-black italic">КУДИ</span>}
+                              {!isFrom && !isTo && <div className={`w-2 h-2 rounded-full ${isIntermediate ? 'bg-brand-yellow' : 'bg-brand-border'}`} />}
+                            </button>
+                            <span className={`mt-4 text-[11px] font-bold text-center max-w-[80px] transition-colors ${isFrom || isTo ? 'text-brand-yellow' : 'text-brand-muted hover:text-white'}`}>
+                              {stop.name}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {!from && <div className="mt-8 text-center text-sm text-brand-yellow animate-pulse">Оберіть точку відправлення</div>}
+                    {from && !to && <div className="mt-8 text-center text-sm text-brand-yellow animate-pulse">Тепер оберіть точку прибуття</div>}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* STEP 3: DATE & TIME */}
+            {from && to && (
+              <div className="space-y-10 pt-8 border-t border-brand-border">
+                <div className="grid md:grid-cols-2 gap-8">
+                    <div>
+                      <h3 className="section-title text-xl mb-4 flex items-center gap-3">
+                        <span className="w-6 h-6 rounded-full bg-brand-yellow text-brand-dark flex items-center justify-center text-[10px] font-black">3</span>
+                        Дата
+                      </h3>
+                      <DatePicker value={date} onChange={d => { setDate(d); setErrors(e => ({ ...e, date: '' })); setSelectedTime(''); }} />
+                      {errors.date && <p className="text-red-400 text-xs mt-1">{errors.date}</p>}
+                    </div>
+
+                    <div className="space-y-6">
+                      <div>
+                        <h3 className="label mb-2">Зупинка для посадки</h3>
+                        <div className="relative">
+                          <MapPin size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-yellow" />
+                          <select 
+                            value={pickupLocation} 
+                            onChange={e => { setPickupLocation(e.target.value); setErrors(err => ({ ...err, pickupLocation: '' })); }}
+                            className="input-field pl-12 h-14 appearance-none"
+                          >
+                            <option value="">Оберіть зупинку...</option>
+                            {PICKUP_LOCATIONS[from]?.map((loc, idx) => (
+                              <option key={idx} value={loc.name}>{loc.name}</option>
+                            ))}
+                          </select>
+                          <ChevronDown size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-brand-muted pointer-events-none" />
+                        </div>
+                        {errors.pickupLocation && <p className="text-red-400 text-xs mt-1">{errors.pickupLocation}</p>}
+                      </div>
+
+                      {(to === 'skhidnytsia' || to === 'truskavets') && (
+                        <div>
+                          <h3 className="label mb-2">Зупинка для висадки</h3>
+                          <div className="relative">
+                            <MapPin size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-yellow" />
+                            <select 
+                              value={dropoffLocation} 
+                              onChange={e => { setDropoffLocation(e.target.value); setErrors(err => ({ ...err, dropoffLocation: '' })); }}
+                              className="input-field pl-12 h-14 appearance-none"
+                            >
+                              <option value="">Оберіть зупинку для висадки...</option>
+                              <option value="ДОСТАВИТИ ДО ГОТЕЛЮ">ДОСТАВИТИ ДО ГОТЕЛЮ</option>
+                              {PICKUP_LOCATIONS[to]?.filter(loc => loc.name !== 'ЗАБРАТИ З ГОТЕЛЮ').map((loc, idx) => (
+                                <option key={idx} value={loc.name}>{loc.name}</option>
+                              ))}
+                            </select>
+                            <ChevronDown size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-brand-muted pointer-events-none" />
+                          </div>
+                          {errors.dropoffLocation && <p className="text-red-400 text-xs mt-1">{errors.dropoffLocation}</p>}
+                        </div>
+                      )}
+                    </div>
+                </div>
+
+                <div>
+                  <h3 className="label mb-4">Доступність екіпажів</h3>
+                  {!date ? (
+                    <div className="card-inner p-10 border border-dashed border-brand-border rounded-2xl text-center text-brand-muted">Оберіть дату поїздки</div>
+                  ) : (
+                    <div className="space-y-4">
+                      {departureTimes.map(time => <AvailabilityCard key={time} time={time} />)}
+                    </div>
+                  )}
+                  {errors.time && <p className="text-red-400 text-xs mt-2">{errors.time}</p>}
+                </div>
+
+                {/* PASSENGER INFO */}
+                <div className="pt-8 border-t border-brand-border">
+                    <h3 className="section-title text-xl mb-6">Дані пасажира та Місця</h3>
+                    <div className="grid lg:grid-cols-3 gap-6">
+                        <div>
+                            <div className="label mb-2">Ваше ім'я</div>
+                            <div className="relative">
+                              <User size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-yellow" />
+                              <input type="text" value={name} onChange={e => { setName(e.target.value); setErrors(err => ({ ...err, name: '' })); }} placeholder="Іван Іваненко" className="input-field pl-12 h-14" />
+                            </div>
+                            {errors.name && <p className="text-red-400 text-xs mt-1">{errors.name}</p>}
+                        </div>
+                        <div>
+                            <div className="label mb-2">Телефон</div>
+                            <div className="relative">
+                              <Phone size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-yellow" />
+                              <input type="tel" value={phone} onChange={e => { setPhone(formatPhone(e.target.value)); setErrors(err => ({ ...err, phone: '' })); }} placeholder="+380" className="input-field pl-12 h-14" />
+                            </div>
+                            {errors.phone && <p className="text-red-400 text-xs mt-1">{errors.phone}</p>}
+                        </div>
+                        <div>
+                            <div className="label mb-2">Кількість місць</div>
+                            <div className="flex gap-2">
+                              {[1, 2, 3, 4].map(n => (
+                                <button
+                                  key={n}
+                                  type="button"
+                                  onClick={() => setSeats(n)}
+                                  className={`flex-1 h-14 rounded-xl text-sm font-bold transition-all ${seats === n ? 'bg-brand-yellow text-brand-dark shadow-brand' : 'bg-brand-surface border border-brand-border text-brand-muted hover:border-brand-yellow/50'}`}
+                                >
+                                  {n}
+                                </button>
+                              ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {price > 0 && selectedTime && (
+                  <div className="space-y-4">
+                    {(pickupLocation === 'ЗАБРАТИ З ГОТЕЛЮ' || dropoffLocation === 'ДОСТАВИТИ ДО ГОТЕЛЮ') && (
+                      <div className="bg-brand-yellow/10 border border-brand-yellow/30 rounded-2xl p-4 text-brand-yellow text-sm leading-relaxed flex items-start gap-3">
+                        <span className="text-xl">🏨</span>
+                        <div>
+                          <p className="font-bold">Ціна за забирання з готелю або доставку до готелю є додатковою.</p>
+                          <p className="text-xs text-brand-muted mt-1">Наш менеджер перетелефонує вам найближчим часом для узгодження вартості цієї послуги.</p>
+                        </div>
+                      </div>
+                    )}
+                    <div className="bg-brand-dark/40 rounded-2xl p-6 border border-brand-yellow/20 flex flex-col md:flex-row justify-between items-center gap-6">
+                      <div>
+                        <div className="text-brand-muted text-xs uppercase tracking-widest font-black mb-1">Разом за {seats} пас.</div>
+                        <div className="text-brand-yellow text-4xl font-display font-black leading-none">{price * seats} грн</div>
+                      </div>
+                      <button type="submit" disabled={isSubmitting} className="btn-primary w-full md:w-auto px-12 py-5 text-lg flex items-center justify-center gap-3 group disabled:opacity-50">
+                        {isSubmitting ? 'Зберігаємо...' : 'Забронювати'}
+                        {!isSubmitting && <ChevronRight size={20} className="group-hover:translate-x-1 transition-transform" />}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </form>
         )}
       </motion.div>
     </section>

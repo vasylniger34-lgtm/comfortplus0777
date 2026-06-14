@@ -120,8 +120,13 @@ export default function BookingFormMockup({ onPay }: BookingFormProps) {
     return departureDate < now;
   };
 
-  const MORNING_TIMES = ['05:50', '06:20', '07:10', '08:10', '08:50', '09:30', '10:35'];
-  const AFTERNOON_TIMES = ['11:10', '12:00', '12:40', '13:20', '14:10', '15:30', '16:20', '17:00', '17:40'];
+  const TIMES_LVIV_TO_SKHIDNYTSIA = [
+    '09:00', '10:15', '11:10', '12:20', '13:10', '14:10', '14:50', '16:10', '18:20', '19:20', '20:00', '20:40'
+  ];
+  const TIMES_SKHIDNYTSIA_TO_LVIV = [
+    '06:20', '07:10', '08:15', '09:30', '10:35', '11:10', '12:00', '13:20', '15:30', '16:20', '17:00', '17:40'
+  ];
+  const departureTimes = directionIndex === 0 ? TIMES_LVIV_TO_SKHIDNYTSIA : TIMES_SKHIDNYTSIA_TO_LVIV;
 
   const handleStopSelect = (stopId: string) => {
     if (!from || (from && to)) {
@@ -284,7 +289,7 @@ export default function BookingFormMockup({ onPay }: BookingFormProps) {
 
   return (
     <section id="booking" className="max-w-6xl mx-auto px-4 py-16">
-      <AnimatePresence>{showCallModal && <CallUsModal onClose={() => setShowCallModal(false)} />}</AnimatePresence>
+      <AnimatePresence>{showCallModal && <CallUsModal onClose={() => { setShowCallModal(false); setFrom(''); setTo(''); }} />}</AnimatePresence>
 
       <motion.div
         initial={{ opacity: 0, y: 30 }}
@@ -439,7 +444,7 @@ export default function BookingFormMockup({ onPay }: BookingFormProps) {
                     <div className="card-inner p-10 border border-dashed border-brand-border rounded-2xl text-center text-brand-muted">Оберіть дату поїздки</div>
                   ) : (
                     <div className="space-y-4">
-                      {MORNING_TIMES.concat(AFTERNOON_TIMES).map(time => <AvailabilityCard key={time} time={time} />)}
+                      {departureTimes.map(time => <AvailabilityCard key={time} time={time} />)}
                     </div>
                   )}
                   {errors.time && <p className="text-red-400 text-xs mt-2">{errors.time}</p>}
