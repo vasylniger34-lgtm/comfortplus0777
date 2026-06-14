@@ -155,6 +155,28 @@ const getCrewByTime = (time: string, fromCity: string, toCity: string) => {
   }
 };
 
+// Хелпери для дат
+const getUADateString = (dateObj: Date) => {
+  const d = String(dateObj.getDate()).padStart(2, '0');
+  const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const y = dateObj.getFullYear();
+  return `${d}.${m}.${y}`;
+};
+
+const formatDateToUA = (isoDate: string) => {
+  if (!isoDate) return '';
+  const [y, m, d] = isoDate.split('-');
+  return `${d}.${m}.${y}`;
+};
+
+const formatDateToISO = (uaDate: string) => {
+  if (!uaDate) return '';
+  const [d, m, y] = uaDate.split('.');
+  return `${y}-${m}-${d}`;
+};
+
+const getTodayISO = () => new Date().toISOString().split('T')[0];
+
 interface DispatcherPanelProps {
   onLogout?: () => void;
   role?: 'dispatcher' | 'junior_dispatcher' | null;
