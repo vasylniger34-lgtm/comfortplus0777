@@ -4,6 +4,15 @@ import { Server } from 'socket.io';
 import cors from 'cors';
 import bcrypt from 'bcryptjs';
 import { dbQuery } from './db.js';
+import crypto from 'crypto';
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.join(__dirname, '.env') });
+dotenv.config({ path: path.join(__dirname, '../.env') });
 
 const app = express();
 const httpServer = createServer(app);
@@ -16,6 +25,7 @@ const io = new Server(httpServer, {
 
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // Логгер запитів
 app.use((req, res, next) => {
@@ -35,8 +45,32 @@ const isLvivToSkhidnytsia = (from, to) => {
   return fromIdx !== -1 && toIdx !== -1 && fromIdx < toIdx;
 };
 
+const normalizeTime = (time) => {
+  if (!time) return '';
+  const trimmed = time.trim().replace('.', ':');
+  const timeRegex = /^(\d{1,2}):(\d{2})$/;
+  const match = trimmed.match(timeRegex);
+  if (match) {
+    const hours = match[1].padStart(2, '0');
+    const minutes = match[2];
+    return `${hours}:${minutes}`;
+  }
+  return trimmed;
+};
+
+const normalizeCrewName = (name) => {
+  if (!name) return '';
+  const trimmed = name.trim();
+  const normalizedTime = normalizeTime(trimmed);
+  if (/^\d{2}:\d{2}$/.test(normalizedTime)) {
+    return normalizedTime;
+  }
+  return trimmed;
+};
+
 const getCrewByTime = (time, fromCity, toCity) => {
   const isLvivDeparture = isLvivToSkhidnytsia(fromCity, toCity);
+  const normTime = normalizeTime(time);
   if (isLvivDeparture) {
     const mapping = {
       '09:00': '06:20', '14:50': '06:20',
@@ -46,9 +80,10 @@ const getCrewByTime = (time, fromCity, toCity) => {
       '13:10': '10:35', '20:00': '10:35',
       '14:10': '11:10', '20:40': '11:10',
     };
-    return mapping[time] || '';
+    return mapping[normTime] || normTime || '';
   } else {
     const mapping = {
+      '05:50': '05:50',
       '06:20': '06:20', '12:00': '06:20',
       '07:10': '07:10', '13:20': '07:10',
       '08:15': '08:15', '15:30': '08:15',
@@ -56,7 +91,7 @@ const getCrewByTime = (time, fromCity, toCity) => {
       '10:35': '10:35', '17:00': '10:35',
       '11:10': '11:10', '17:40': '11:10',
     };
-    return mapping[time] || '';
+    return mapping[normTime] || normTime || '';
   }
 };
 
@@ -179,6 +214,8 @@ app.get('/api/bookings', async (req, res) => {
     if (user_id) {
       sql += ' AND user_id = ?';
       params.push(user_id);
+    } else {
+      sql += " AND status IN ('active', 'pending')";
     }
     if (date) {
       sql += ' AND bus_date = ?';
@@ -209,6 +246,28 @@ app.get('/api/bookings', async (req, res) => {
   }
 });
 
+// Отримати одне бронювання
+app.get('/api/bookings/:id', async (req, res) => {
+  try {
+    const booking = await dbQuery.get('SELECT * FROM bookings WHERE id = ?', [req.params.id]);
+    if (!booking) {
+      return res.status(404).json({ error: 'Бронювання не знайдено' });
+    }
+    const mapped = {
+      ...booking,
+      from: booking.bus_from,
+      to: booking.bus_to,
+      date: booking.bus_date,
+      name: booking.passenger_name,
+      phone: booking.passenger_phone
+    };
+    res.json(mapped);
+  } catch (err) {
+    console.error('Помилка отримання бронювання:', err);
+    res.status(500).json({ error: 'Внутрішня помилка сервера' });
+  }
+});
+
 // Створити бронювання
 app.post('/api/bookings', async (req, res) => {
   const {
@@ -225,6 +284,7 @@ app.post('/api/bookings', async (req, res) => {
     crew,
     status,
     updated_by,
+    is_paid_online,
     // також сумісні поля
     from,
     to,
@@ -239,29 +299,33 @@ app.post('/api/bookings', async (req, res) => {
   const f_name = passenger_name || name;
   const f_phone = passenger_phone || phone;
 
+  const finalTime = normalizeTime(departure_time);
+
   // Автоматичне вирахування екіпажу якщо поле пусте
   let finalCrew = crew;
   if (!finalCrew) {
-    finalCrew = getCrewByTime(departure_time, f_from, f_to);
+    finalCrew = getCrewByTime(finalTime, f_from, f_to);
   }
+  const finalCrewNorm = normalizeCrewName(finalCrew);
 
   try {
+    const finalStatus = status || 'active';
     const id = 'bk_' + Date.now() + Math.random().toString(36).substr(2, 4);
     await dbQuery.run(
       `INSERT INTO bookings (
         id, user_id, bus_from, bus_to, bus_date, departure_time, 
         seats, price, status, passenger_name, passenger_phone, 
-        pickup_location, crew, updated_by
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        pickup_location, crew, updated_by, is_paid_online
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        id, user_id, f_from, f_to, f_date, departure_time,
-        seats, price, status || 'active', f_name, f_phone,
-        pickup_location, finalCrew, updated_by || 'Клієнт'
+        id, user_id, f_from, f_to, f_date, finalTime,
+        seats, price, finalStatus, f_name, f_phone,
+        pickup_location, finalCrewNorm, updated_by || 'Клієнт', is_paid_online || 0
       ]
     );
 
     // Лояльність: оновити completed_rides
-    if (user_id) {
+    if (user_id && finalStatus === 'active') {
       const user = await dbQuery.get('SELECT completed_rides FROM profiles WHERE id = ?', [user_id]);
       if (user) {
         let newCompletedRides = user.completed_rides;
@@ -308,7 +372,9 @@ app.put('/api/bookings/:id', async (req, res) => {
     date,
     name,
     phone,
-    updated_by
+    updated_by,
+    user_id,
+    is_paid_online
   } = req.body;
   const id = req.params.id;
 
@@ -331,18 +397,23 @@ app.put('/api/bookings/:id', async (req, res) => {
     const updatedName = name !== undefined ? name : booking.passenger_name;
     const updatedPhone = phone !== undefined ? phone : booking.passenger_phone;
     const updatedBy = updated_by !== undefined ? updated_by : booking.updated_by;
+    const updatedUserId = user_id !== undefined ? user_id : booking.user_id;
+    const updatedIsPaidOnline = is_paid_online !== undefined ? is_paid_online : booking.is_paid_online;
+
+    const normTime = normalizeTime(updatedTime);
+    const normCrew = normalizeCrewName(updatedCrew);
 
     await dbQuery.run(
       `UPDATE bookings SET 
         status = ?, pickup_location = ?, seats = ?, price = ?, 
         departure_time = ?, crew = ?, bus_from = ?, bus_to = ?,
         bus_date = ?, passenger_name = ?, passenger_phone = ?,
-        updated_by = ?
+        updated_by = ?, user_id = ?, is_paid_online = ?
       WHERE id = ?`,
       [
         updatedStatus, updatedPickup, updatedSeats, updatedPrice, 
-        updatedTime, updatedCrew, updatedFrom, updatedTo, 
-        updatedDate, updatedName, updatedPhone, updatedBy, id
+        normTime, normCrew, updatedFrom, updatedTo, 
+        updatedDate, updatedName, updatedPhone, updatedBy, updatedUserId, updatedIsPaidOnline, id
       ]
     );
 
@@ -386,6 +457,20 @@ app.delete('/api/bookings/:id', async (req, res) => {
   }
 });
 
+// Внутрішній ендпоінт для очищення кешу та примусового оновлення через сокети (лише локально)
+app.post('/api/internal/trigger-reload', (req, res) => {
+  const ip = req.socket.remoteAddress;
+  const isLocal = ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
+  if (!isLocal) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  io.emit('bookings_changed');
+  io.emit('schedules_changed');
+  io.emit('assignments_changed');
+  res.json({ success: true });
+});
+
+
 // ==========================================
 // 2A. РОЗКЛАД ЕКІПАЖІВ (CREW SCHEDULES)
 // ==========================================
@@ -419,11 +504,29 @@ app.post('/api/schedules', async (req, res) => {
     run1_time,
     run2_time,
     run3_time,
-    run4_time
+    run4_time,
+    run5_time = '',
+    run6_time = '',
+    run7_time = '',
+    run8_time = '',
+    run9_time = '',
+    run10_time = ''
   } = req.body;
 
-  if (!date || !crew_name || !run1_time || !run2_time || !run3_time || !run4_time) {
-    return res.status(400).json({ error: 'Заповніть всі обов\'язкові поля' });
+  const normCrewName = normalizeCrewName(crew_name);
+  const normRun1 = normalizeTime(run1_time);
+  const normRun2 = normalizeTime(run2_time);
+  const normRun3 = normalizeTime(run3_time);
+  const normRun4 = normalizeTime(run4_time);
+  const normRun5 = normalizeTime(run5_time);
+  const normRun6 = normalizeTime(run6_time);
+  const normRun7 = normalizeTime(run7_time);
+  const normRun8 = normalizeTime(run8_time);
+  const normRun9 = normalizeTime(run9_time);
+  const normRun10 = normalizeTime(run10_time);
+
+  if (!date || !normCrewName || !driver_id || !car || !normRun1 || !normRun2 || !normRun3 || !normRun4) {
+    return res.status(400).json({ error: 'Заповніть всі обов\'язкові поля (включаючи водія та автомобіль)' });
   }
 
   try {
@@ -431,11 +534,13 @@ app.post('/api/schedules', async (req, res) => {
     await dbQuery.run(
       `INSERT INTO crew_schedules (
         id, date, crew_name, driver_id, car, 
-        run1_time, run2_time, run3_time, run4_time
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        run1_time, run2_time, run3_time, run4_time,
+        run5_time, run6_time, run7_time, run8_time, run9_time, run10_time
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        id, date, crew_name, driver_id || null, car || null,
-        run1_time, run2_time, run3_time, run4_time
+        id, date, normCrewName, driver_id, car,
+        normRun1, normRun2, normRun3, normRun4,
+        normRun5, normRun6, normRun7, normRun8, normRun9, normRun10
       ]
     );
 
@@ -457,6 +562,12 @@ app.put('/api/schedules/:id', async (req, res) => {
     run2_time,
     run3_time,
     run4_time,
+    run5_time,
+    run6_time,
+    run7_time,
+    run8_time,
+    run9_time,
+    run10_time,
     crew_name
   } = req.body;
   const id = req.params.id;
@@ -473,16 +584,42 @@ app.put('/api/schedules/:id', async (req, res) => {
     const updatedRun2 = run2_time !== undefined ? run2_time : schedule.run2_time;
     const updatedRun3 = run3_time !== undefined ? run3_time : schedule.run3_time;
     const updatedRun4 = run4_time !== undefined ? run4_time : schedule.run4_time;
+    const updatedRun5 = run5_time !== undefined ? run5_time : (schedule.run5_time || '');
+    const updatedRun6 = run6_time !== undefined ? run6_time : (schedule.run6_time || '');
+    const updatedRun7 = run7_time !== undefined ? run7_time : (schedule.run7_time || '');
+    const updatedRun8 = run8_time !== undefined ? run8_time : (schedule.run8_time || '');
+    const updatedRun9 = run9_time !== undefined ? run9_time : (schedule.run9_time || '');
+    const updatedRun10 = run10_time !== undefined ? run10_time : (schedule.run10_time || '');
     const updatedCrewName = crew_name !== undefined ? crew_name : schedule.crew_name;
+
+    if (!updatedDriverId || !updatedCar) {
+      return res.status(400).json({ error: 'Водій та автомобіль є обов\'язковими для збереження рейсу' });
+    }
+
+    const normDriverId = updatedDriverId;
+    const normCar = updatedCar;
+    const normRun1 = normalizeTime(updatedRun1);
+    const normRun2 = normalizeTime(updatedRun2);
+    const normRun3 = normalizeTime(updatedRun3);
+    const normRun4 = normalizeTime(updatedRun4);
+    const normRun5 = normalizeTime(updatedRun5);
+    const normRun6 = normalizeTime(updatedRun6);
+    const normRun7 = normalizeTime(updatedRun7);
+    const normRun8 = normalizeTime(updatedRun8);
+    const normRun9 = normalizeTime(updatedRun9);
+    const normRun10 = normalizeTime(updatedRun10);
+    const normCrewName = normalizeCrewName(updatedCrewName);
 
     await dbQuery.run(
       `UPDATE crew_schedules SET 
         driver_id = ?, car = ?, run1_time = ?, run2_time = ?, 
-        run3_time = ?, run4_time = ?, crew_name = ?
+        run3_time = ?, run4_time = ?, run5_time = ?, run6_time = ?,
+        run7_time = ?, run8_time = ?, run9_time = ?, run10_time = ?, crew_name = ?
       WHERE id = ?`,
       [
-        updatedDriverId, updatedCar, updatedRun1, updatedRun2,
-        updatedRun3, updatedRun4, updatedCrewName, id
+        normDriverId, normCar, normRun1, normRun2,
+        normRun3, normRun4, normRun5, normRun6,
+        normRun7, normRun8, normRun9, normRun10, normCrewName, id
       ]
     );
 
@@ -500,6 +637,207 @@ app.delete('/api/schedules/:id', async (req, res) => {
   try {
     await dbQuery.run('DELETE FROM crew_schedules WHERE id = ?', [req.params.id]);
     io.emit('schedules_changed');
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Внутрішня помилка сервера' });
+  }
+});
+
+// ==========================================
+// ДИСПЕТЧЕРИ (DISPATCHERS)
+// ==========================================
+
+// Авторизація диспетчера за PIN-кодом
+app.post('/api/dispatchers/login', async (req, res) => {
+  const { pin_code } = req.body;
+  if (!pin_code) {
+    return res.status(400).json({ error: 'Введіть PIN-код' });
+  }
+  try {
+    const dispatcher = await dbQuery.get('SELECT id, name, role FROM dispatchers WHERE pin_code = ?', [pin_code]);
+    if (dispatcher) {
+      return res.json(dispatcher);
+    }
+    res.status(404).json({ error: 'Диспетчера з таким кодом не знайдено' });
+  } catch (err) {
+    console.error('Помилка входу диспетчера:', err);
+    res.status(500).json({ error: 'Внутрішня помилка сервера' });
+  }
+});
+
+app.get('/api/dispatchers', async (req, res) => {
+  try {
+    const dispatchers = await dbQuery.all('SELECT id, name, pin_code, role, created_at FROM dispatchers ORDER BY name ASC');
+    res.json(dispatchers);
+  } catch (err) {
+    res.status(500).json({ error: 'Внутрішня помилка сервера' });
+  }
+});
+
+app.post('/api/dispatchers', async (req, res) => {
+  const { name, pin_code, role } = req.body;
+  if (!name || !pin_code) {
+    return res.status(400).json({ error: 'Заповніть обов\'язкові поля' });
+  }
+  try {
+    const existing = await dbQuery.get('SELECT id FROM dispatchers WHERE pin_code = ?', [pin_code]);
+    if (existing) {
+      return res.status(400).json({ error: 'Диспетчер з таким PIN-кодом вже існує' });
+    }
+    
+    const existingDriver = await dbQuery.get('SELECT id FROM driver_profiles WHERE pin_code = ?', [pin_code]);
+    if (existingDriver) {
+      return res.status(400).json({ error: 'Цей PIN-код вже використовується водієм' });
+    }
+
+    const id = 'disp_' + Date.now();
+    await dbQuery.run(
+      'INSERT INTO dispatchers (id, name, pin_code, role) VALUES (?, ?, ?, ?)',
+      [id, name, pin_code, role || 'junior_dispatcher']
+    );
+    const row = await dbQuery.get('SELECT * FROM dispatchers WHERE id = ?', [id]);
+    io.emit('dispatchers_changed');
+    res.status(201).json(row);
+  } catch (err) {
+    console.error('Помилка створення диспетчера:', err);
+    res.status(500).json({ error: 'Внутрішня помилка сервера' });
+  }
+});
+
+app.delete('/api/dispatchers/:id', async (req, res) => {
+  const id = req.params.id;
+  if (id === 'disp-1') {
+    return res.status(400).json({ error: 'Неможливо видалити головного диспетчера' });
+  }
+  try {
+    await dbQuery.run('DELETE FROM dispatchers WHERE id = ?', [id]);
+    io.emit('dispatchers_changed');
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Внутрішня помилка сервера' });
+  }
+});
+
+// ==========================================
+// ШАБЛОНИ ЕКІПАЖІВ (CREW TEMPLATES)
+// ==========================================
+
+app.get('/api/templates', async (req, res) => {
+  try {
+    const templates = await dbQuery.all('SELECT * FROM crew_templates ORDER BY name ASC');
+    res.json(templates);
+  } catch (err) {
+    res.status(500).json({ error: 'Внутрішня помилка сервера' });
+  }
+});
+
+app.post('/api/templates', async (req, res) => {
+  const {
+    name,
+    run1_time,
+    run2_time,
+    run3_time,
+    run4_time,
+    run5_time = '',
+    run6_time = '',
+    run7_time = '',
+    run8_time = '',
+    run9_time = '',
+    run10_time = ''
+  } = req.body;
+  if (!name || !run1_time || !run2_time || !run3_time || !run4_time) {
+    return res.status(400).json({ error: 'Заповніть обов\'язкові поля' });
+  }
+  try {
+    const existing = await dbQuery.get('SELECT id FROM crew_templates WHERE name = ?', [name]);
+    if (existing) {
+      return res.status(400).json({ error: 'Шаблон з такою назвою вже існує' });
+    }
+
+    const id = 'temp_' + Date.now();
+    await dbQuery.run(
+      `INSERT INTO crew_templates (
+        id, name, run1_time, run2_time, run3_time, run4_time,
+        run5_time, run6_time, run7_time, run8_time, run9_time, run10_time
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id, name, run1_time, run2_time, run3_time, run4_time,
+        run5_time, run6_time, run7_time, run8_time, run9_time, run10_time
+      ]
+    );
+    const row = await dbQuery.get('SELECT * FROM crew_templates WHERE id = ?', [id]);
+    io.emit('templates_changed');
+    res.status(201).json(row);
+  } catch (err) {
+    console.error('Помилка створення шаблону:', err);
+    res.status(500).json({ error: 'Внутрішня помилка сервера' });
+  }
+});
+
+app.put('/api/templates/:id', async (req, res) => {
+  const id = req.params.id;
+  const {
+    name,
+    run1_time,
+    run2_time,
+    run3_time,
+    run4_time,
+    run5_time,
+    run6_time,
+    run7_time,
+    run8_time,
+    run9_time,
+    run10_time
+  } = req.body;
+  try {
+    const template = await dbQuery.get('SELECT * FROM crew_templates WHERE id = ?', [id]);
+    if (!template) {
+      return res.status(404).json({ error: 'Шаблон не знайдено' });
+    }
+
+    const updatedName = name !== undefined ? name : template.name;
+    const updatedRun1 = run1_time !== undefined ? run1_time : template.run1_time;
+    const updatedRun2 = run2_time !== undefined ? run2_time : template.run2_time;
+    const updatedRun3 = run3_time !== undefined ? run3_time : template.run3_time;
+    const updatedRun4 = run4_time !== undefined ? run4_time : template.run4_time;
+    const updatedRun5 = run5_time !== undefined ? run5_time : (template.run5_time || '');
+    const updatedRun6 = run6_time !== undefined ? run6_time : (template.run6_time || '');
+    const updatedRun7 = run7_time !== undefined ? run7_time : (template.run7_time || '');
+    const updatedRun8 = run8_time !== undefined ? run8_time : (template.run8_time || '');
+    const updatedRun9 = run9_time !== undefined ? run9_time : (template.run9_time || '');
+    const updatedRun10 = run10_time !== undefined ? run10_time : (template.run10_time || '');
+
+    if (updatedName !== template.name) {
+      const existing = await dbQuery.get('SELECT id FROM crew_templates WHERE name = ?', [updatedName]);
+      if (existing) {
+        return res.status(400).json({ error: 'Шаблон з такою назвою вже існує' });
+      }
+    }
+
+    await dbQuery.run(
+      `UPDATE crew_templates SET 
+        name = ?, run1_time = ?, run2_time = ?, run3_time = ?, run4_time = ?,
+        run5_time = ?, run6_time = ?, run7_time = ?, run8_time = ?, run9_time = ?, run10_time = ?
+      WHERE id = ?`,
+      [
+        updatedName, updatedRun1, updatedRun2, updatedRun3, updatedRun4,
+        updatedRun5, updatedRun6, updatedRun7, updatedRun8, updatedRun9, updatedRun10,
+        id
+      ]
+    );
+    const row = await dbQuery.get('SELECT * FROM crew_templates WHERE id = ?', [id]);
+    io.emit('templates_changed');
+    res.json(row);
+  } catch (err) {
+    console.error('Помилка оновлення шаблону:', err);
+    res.status(500).json({ error: 'Внутрішня помилка сервера' });
+  }
+});
+
+app.delete('/api/templates/:id', async (req, res) => {
+  try {
+    await dbQuery.run('DELETE FROM crew_templates WHERE id = ?', [req.params.id]);
+    io.emit('templates_changed');
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Внутрішня помилка сервера' });
@@ -556,6 +894,51 @@ app.delete('/api/drivers/:id', async (req, res) => {
   }
 });
 
+// ==========================================
+// МАШИНИ (CARS)
+// ==========================================
+
+app.get('/api/cars', async (req, res) => {
+  try {
+    const cars = await dbQuery.all('SELECT * FROM cars ORDER BY plate ASC');
+    res.json(cars);
+  } catch (err) {
+    res.status(500).json({ error: 'Внутрішня помилка сервера' });
+  }
+});
+
+app.post('/api/cars', async (req, res) => {
+  const { plate, seats, description, model, colorName, colorHex } = req.body;
+  try {
+    if (!plate || !seats) {
+      return res.status(400).json({ error: 'Номер машини та кількість місць є обов\'язковими' });
+    }
+    await dbQuery.run(
+      'INSERT INTO cars (plate, seats, description, model, color_name, color_hex) VALUES (?, ?, ?, ?, ?, ?)',
+      [plate.trim().toUpperCase(), parseInt(seats), description || '', model || '', colorName || '', colorHex || '']
+    );
+    const newCar = await dbQuery.get('SELECT * FROM cars WHERE plate = ?', [plate.trim().toUpperCase()]);
+    io.emit('assignments_changed');
+    res.json(newCar);
+  } catch (err) {
+    if (err.message && err.message.includes('UNIQUE constraint failed')) {
+      return res.status(400).json({ error: 'Машина з таким номером вже існує в базі даних' });
+    }
+    res.status(500).json({ error: 'Внутрішня помилка сервера' });
+  }
+});
+
+app.delete('/api/cars/:plate', async (req, res) => {
+  try {
+    const plate = req.params.plate;
+    await dbQuery.run('DELETE FROM cars WHERE plate = ?', [plate]);
+    io.emit('assignments_changed');
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Внутрішня помилка сервера' });
+  }
+});
+
 app.get('/api/drivers/by-pin/:pin', async (req, res) => {
   try {
     const driver = await dbQuery.get('SELECT * FROM driver_profiles WHERE pin_code = ?', [req.params.pin]);
@@ -580,11 +963,12 @@ app.get('/api/assignments', async (req, res) => {
 
 app.post('/api/assignments', async (req, res) => {
   const { driver_id, car, crew, date } = req.body;
+  const normCrew = normalizeCrewName(crew);
   try {
     if (!driver_id && !car) {
-      await dbQuery.run('DELETE FROM driver_assignments WHERE crew = ? AND date = ?', [crew, date]);
+      await dbQuery.run('DELETE FROM driver_assignments WHERE crew = ? AND date = ?', [normCrew, date]);
     } else {
-      const existing = await dbQuery.get('SELECT id FROM driver_assignments WHERE crew = ? AND date = ?', [crew, date]);
+      const existing = await dbQuery.get('SELECT id FROM driver_assignments WHERE crew = ? AND date = ?', [normCrew, date]);
       if (existing) {
         await dbQuery.run(
           'UPDATE driver_assignments SET driver_id = ?, car = ? WHERE id = ?',
@@ -594,7 +978,7 @@ app.post('/api/assignments', async (req, res) => {
         const id = 'asg_' + Date.now();
         await dbQuery.run(
           'INSERT INTO driver_assignments (id, driver_id, car, crew, date) VALUES (?, ?, ?, ?, ?)',
-          [id, driver_id, car, crew, date]
+          [id, driver_id, car, normCrew, date]
         );
       }
     }
@@ -707,6 +1091,251 @@ app.post('/api/telegram/webhook', async (req, res) => {
 });
 
 // ==========================================
+// PORTMONE PAYMENT INTEGRATION
+// ==========================================
+
+// Обчислення підпису Portmone
+function getPortmoneSignature(payeeId, shopOrderNumber, billAmount, dt, secretKey) {
+  if (!secretKey) return '';
+  const hexOrder = Buffer.from(shopOrderNumber, 'utf8').toString('hex');
+  const login = process.env.PORTMONE_LOGIN || '';
+  const hexLogin = Buffer.from(login, 'utf8').toString('hex');
+  
+  let str = payeeId + dt + hexOrder + billAmount;
+  str = str.toUpperCase() + hexLogin.toUpperCase();
+  
+  return crypto.createHmac('sha256', secretKey)
+    .update(str)
+    .digest('hex')
+    .toUpperCase();
+}
+
+// Загальна функція обробки успішного платежу
+async function processPayment(bookingId, amount, status) {
+  try {
+    const booking = await dbQuery.get('SELECT * FROM bookings WHERE id = ?', [bookingId]);
+    if (!booking) {
+      console.warn(`[Portmone Callback] Booking not found: ${bookingId}`);
+      return false;
+    }
+
+    if (booking.status === 'active') {
+      console.log(`[Portmone Callback] Booking ${bookingId} already processed (active).`);
+      return true;
+    }
+
+    // Оновлюємо статус бронювання у базі
+    await dbQuery.run("UPDATE bookings SET status = 'active', is_paid_online = 1 WHERE id = ?", [bookingId]);
+    console.log(`[Portmone Callback] Booking ${bookingId} status updated to active and is_paid_online set to 1.`);
+
+    // Оновлення лояльності користувача
+    if (booking.user_id) {
+      const user = await dbQuery.get('SELECT completed_rides FROM profiles WHERE id = ?', [booking.user_id]);
+      if (user) {
+        let newCompletedRides = user.completed_rides;
+        if (booking.price === 0) {
+          newCompletedRides = 0;
+        } else {
+          newCompletedRides += 1;
+        }
+        await dbQuery.run('UPDATE profiles SET completed_rides = ? WHERE id = ?', [newCompletedRides, booking.user_id]);
+        console.log(`[Portmone Callback] Updated user loyalty completed_rides to ${newCompletedRides} for user ${booking.user_id}`);
+      }
+    }
+
+    // Надсилаємо дані у Google Таблиці
+    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxd8ZIMLZdgaOKw7YBmbTK72mCUvy8rmRcOUvqQ2W3vZifJy3wTVbh_q-ikWL1FarXk/exec';
+    const pricePerSeat = booking.price / booking.seats;
+    const googlePayload = {
+      from: booking.bus_from + (booking.pickup_location ? ` (${booking.pickup_location})` : ''),
+      to: booking.bus_to,
+      date: booking.bus_date,
+      name: booking.passenger_name,
+      phone: booking.passenger_phone,
+      seats: booking.seats,
+      departureTime: booking.departure_time,
+      price: pricePerSeat
+    };
+
+    fetch(SCRIPT_URL, {
+      method: 'POST',
+      redirect: 'follow',
+      cache: 'no-cache',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(googlePayload)
+    }).catch(err => console.error('[Portmone Callback] Error writing to Google Sheets:', err));
+
+    // Надсилаємо сповіщення у Telegram
+    const botToken = '8615069227:AAEiCjdj66e469JqarZxWSlfzFQs1jGkr4M';
+    const ADMIN_CHAT_IDS = ['8472692319', '8618558820'];
+    
+    const isHotelPickup = booking.pickup_location && booking.pickup_location.includes('ЗАБРАТИ З ГОТЕЛЮ');
+    const isHotelDropoff = booking.pickup_location && booking.pickup_location.includes('ДОСТАВИТИ ДО ГОТЕЛЮ');
+    const isHotelTrip = isHotelPickup || isHotelDropoff;
+
+    const adminText = `🔔 Нова онлайн-оплата Portmone!\n\n👤 Клієнт: ${booking.passenger_name}\n📞 Телефон: ${booking.passenger_phone}\nМаршрут: ${booking.bus_from} → ${booking.bus_to}\n🚏 Посадка: ${booking.pickup_location || 'Стандартна'}\n📅 Дата: ${booking.bus_date}\n🕒 Час: ${booking.departure_time}\n👥 Місць: ${booking.seats}\n💰 Оплачено: ${booking.price} грн${isHotelTrip ? ' (+ додаткова оплата за готель)' : ''}\n💳 Статус: ОПЛАЧЕНО`;
+    
+    for (const adminId of ADMIN_CHAT_IDS) {
+      fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: adminId, text: adminText })
+      }).catch(err => console.error('[Portmone Callback] Error sending Telegram message:', err));
+    }
+
+    if (isHotelTrip) {
+      const hotelText = `🏨 УВАГА! Забір/доставка з готелю (ОПЛАЧЕНО)\n\n👤 Клієнт: ${booking.passenger_name}\n📞 Телефон: ${booking.passenger_phone}\nМаршрут: ${booking.bus_from} → ${booking.bus_to}\n🚏 Посадка: ${booking.pickup_location || 'Стандартна'}\n📅 Дата: ${booking.bus_date}\n🕒 Час: ${booking.departure_time}\n👥 Місць: ${booking.seats}\n💰 Оплачено: ${booking.price} грн\n\n⚠️ Клієнт замовив готельний трансфер. Зв'яжіться для узгодження доплати!`;
+      for (const adminId of ADMIN_CHAT_IDS) {
+        fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chat_id: adminId, text: hotelText })
+        }).catch(err => console.error('[Portmone Callback] Error sending hotel Telegram message:', err));
+      }
+    }
+
+    // Повідомляємо диспетчерську панель по Socket.io
+    io.emit('bookings_changed');
+
+    return true;
+  } catch (err) {
+    console.error(`[Portmone Callback] Error in processPayment for ${bookingId}:`, err);
+    return false;
+  }
+}
+
+// Ініціація платежу Portmone
+app.post('/api/payments/portmone/initiate', async (req, res) => {
+  const { bookingId } = req.body;
+  if (!bookingId) {
+    return res.status(400).json({ error: 'Вкажіть bookingId' });
+  }
+
+  try {
+    const booking = await dbQuery.get('SELECT * FROM bookings WHERE id = ?', [bookingId]);
+    if (!booking) {
+      return res.status(404).json({ error: 'Бронювання не знайдено' });
+    }
+
+    const payeeId = process.env.PORTMONE_PAYEE_ID || '1185';
+    const secretKey = process.env.PORTMONE_SECRET_KEY || '';
+    const siteUrl = process.env.VITE_API_URL || 'https://comfortplus0777.com.ua';
+
+    // Дата у форматі YYYYMMDDHHMMSS
+    const now = new Date();
+    const dt = now.getFullYear() +
+      String(now.getMonth() + 1).padStart(2, '0') +
+      String(now.getDate()).padStart(2, '0') +
+      String(now.getHours()).padStart(2, '0') +
+      String(now.getMinutes()).padStart(2, '0') +
+      String(now.getSeconds()).padStart(2, '0');
+
+    const amount = Number(booking.price).toFixed(2);
+    const description = `Квиток ${booking.bus_from} - ${booking.bus_to}, ${booking.bus_date}`;
+    
+    const successUrl = `${siteUrl}/api/payments/portmone/return`;
+    const failureUrl = `${siteUrl}/api/payments/portmone/return`;
+
+    const params = {
+      payee_id: payeeId,
+      shop_order_number: booking.id,
+      bill_amount: amount,
+      description: description,
+      success_url: successUrl,
+      failure_url: failureUrl,
+      lang: 'uk',
+      dt: dt
+    };
+
+    if (secretKey) {
+      params.signature = getPortmoneSignature(payeeId, booking.id, amount, dt, secretKey);
+    }
+
+    res.json({
+      action: 'https://www.portmone.com.ua/gateway/',
+      params: params
+    });
+  } catch (err) {
+    console.error('Помилка ініціації оплати Portmone:', err);
+    res.status(500).json({ error: 'Внутрішня помилка сервера' });
+  }
+});
+
+// Callback від Portmone (сервер-сервер)
+app.post('/api/payments/portmone/callback', async (req, res) => {
+  console.log('[Portmone Callback received POST]:', req.body);
+  
+  const shopOrderNumber = req.body.SHOPORDERNUMBER || req.body.shop_order_number;
+  const statusVal = req.body.RESULT || req.body.status;
+  const billAmount = req.body.BILLAMOUNT || req.body.bill_amount;
+
+  if (!shopOrderNumber || statusVal === undefined) {
+    return res.status(400).send('Missing SHOPORDERNUMBER or RESULT');
+  }
+
+  const isSuccess = (statusVal === 'PAYED' || statusVal === '0' || statusVal === 0 || statusVal === 'success');
+
+  if (isSuccess) {
+    const success = await processPayment(shopOrderNumber, billAmount, 'PAYED');
+    if (success) {
+      return res.send('OK');
+    } else {
+      return res.status(500).send('Error processing payment');
+    }
+  }
+
+  res.send('NOT_PAYED');
+});
+
+// Клієнтський редирект від Portmone після оплати (POST)
+app.post('/api/payments/portmone/return', async (req, res) => {
+  console.log('[Portmone Return received POST]:', req.body);
+  
+  const shopOrderNumber = req.body.SHOPORDERNUMBER || req.body.shop_order_number;
+  const statusVal = req.body.RESULT || req.body.status;
+  const billAmount = req.body.BILLAMOUNT || req.body.bill_amount;
+  
+  const siteUrl = process.env.VITE_API_URL || 'https://comfortplus0777.com.ua';
+
+  if (!shopOrderNumber) {
+    return res.redirect(`${siteUrl}/payment?failure=true`);
+  }
+
+  const isSuccess = (statusVal === 'PAYED' || statusVal === '0' || statusVal === 0 || statusVal === 'success');
+
+  if (isSuccess) {
+    await processPayment(shopOrderNumber, billAmount, 'PAYED');
+    return res.redirect(`${siteUrl}/payment?success=true&booking_id=${shopOrderNumber}`);
+  } else {
+    return res.redirect(`${siteUrl}/payment?failure=true&booking_id=${shopOrderNumber}`);
+  }
+});
+
+// Додатковий обробник для GET на випадок, якщо Portmone робить GET редирект
+app.get('/api/payments/portmone/return', async (req, res) => {
+  console.log('[Portmone Return received GET]:', req.query);
+  
+  const shopOrderNumber = req.query.SHOPORDERNUMBER || req.query.shop_order_number;
+  const statusVal = req.query.RESULT || req.query.status;
+  const billAmount = req.query.BILLAMOUNT || req.query.bill_amount;
+  
+  const siteUrl = process.env.VITE_API_URL || 'https://comfortplus0777.com.ua';
+
+  if (!shopOrderNumber) {
+    return res.redirect(`${siteUrl}/payment?failure=true`);
+  }
+
+  const isSuccess = (statusVal === 'PAYED' || statusVal === '0' || statusVal === 0 || statusVal === 'success');
+
+  if (isSuccess) {
+    await processPayment(shopOrderNumber, billAmount, 'PAYED');
+    return res.redirect(`${siteUrl}/payment?success=true&booking_id=${shopOrderNumber}`);
+  } else {
+    return res.redirect(`${siteUrl}/payment?failure=true&booking_id=${shopOrderNumber}`);
+  }
+});
+
+// ==========================================
 // SOCKET.IO КЛІЄНТСЬКІ КІМНАТИ
 // ==========================================
 io.on('connection', (socket) => {
@@ -720,6 +1349,15 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     console.log('Клієнт від\'єднався:', socket.id);
   });
+});
+
+// Глобальні обробники помилок для стабільності процесу
+process.on('uncaughtException', (err) => {
+  console.error('[UNCAUGHT EXCEPTION]:', err);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[UNHANDLED REJECTION]:', reason);
 });
 
 const PORT = process.env.PORT || 5000;

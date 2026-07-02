@@ -1,13 +1,14 @@
 import { useState } from 'react';
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import AdminPage from './pages/AdminPage';
+import PaymentPage from './pages/PaymentPage';
+import TariffsPage from './pages/TariffsPage';
 import { AnimatePresence } from 'framer-motion';
 
 import Header from './components/layout/Header';
 import Footer from './components/layout/Footer';
 import Hero from './components/Hero';
 import BookingForm from './components/booking/BookingForm';
-import PaymentModal from './components/payment/PaymentModal';
 import ReviewsBlock from './components/reviews/ReviewsBlock';
 import ChatWidget from './components/chat/ChatWidget';
 import TransfersBlock from './components/transfers/TransfersBlock';
@@ -22,15 +23,25 @@ import { PrivacyPolicy, PublicOffer, RefundPolicy } from './components/legal/Pol
 
 function HomePage({ 
   scrollToBooking, 
-  setPaymentData 
+  onPay 
 }: { 
   scrollToBooking: () => void; 
-  setPaymentData: (data: BookingData | null) => void 
+  onPay: (data: BookingData) => void 
 }) {
+  const [directionIndex, setDirectionIndex] = useState<number | null>(null);
+
   return (
     <main>
-      <Hero onBookNow={scrollToBooking} />
-      <BookingForm onPay={setPaymentData} />
+      <Hero 
+        onBookNow={scrollToBooking} 
+        directionIndex={directionIndex} 
+        setDirectionIndex={setDirectionIndex} 
+      />
+      <BookingForm 
+        onPay={onPay} 
+        directionIndex={directionIndex} 
+        setDirectionIndex={setDirectionIndex} 
+      />
       <TransfersBlock />
       <ReviewsBlock />
     </main>
@@ -40,7 +51,8 @@ function HomePage({
 function LegalPage({ content: Content, title }: { content: React.FC, title: string }) {
   return (
     <main className="pt-32 pb-20 max-w-4xl mx-auto px-4">
-      <div className="bg-brand-surface border border-brand-border rounded-3xl p-8 md:p-12 shadow-2xl">
+      <div className="bg-brand-surface border border-brand-border rounded-3xl p-8 md:p-12 shadow-2xl space-y-6">
+        <h1 className="text-3xl font-display font-black text-white">{title}</h1>
         <Content />
       </div>
     </main>
@@ -48,7 +60,6 @@ function LegalPage({ content: Content, title }: { content: React.FC, title: stri
 }
 
 function MainApp() {
-  const [paymentData, setPaymentData] = useState<BookingData | null>(null);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isCabinetOpen, setIsCabinetOpen] = useState(false);
   const [legalModal, setLegalModal] = useState<{ isOpen: boolean; type: 'privacy' | 'terms' | 'refund' }>({
@@ -58,6 +69,7 @@ function MainApp() {
   
   const { user } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const isAdmin = location.pathname.startsWith('/admin');
 
   const scrollToBooking = () => {
@@ -73,6 +85,10 @@ function MainApp() {
     setLegalModal({ isOpen: true, type });
   };
 
+  const handlePayRedirect = (data: BookingData) => {
+    navigate('/payment', { state: { bookingData: data } });
+  };
+
   return (
     <div className="min-h-screen bg-brand-dark">
       {!isAdmin && (
@@ -83,7 +99,9 @@ function MainApp() {
       )}
       
       <Routes>
-        <Route path="/" element={<HomePage scrollToBooking={scrollToBooking} setPaymentData={setPaymentData} />} />
+        <Route path="/" element={<HomePage scrollToBooking={scrollToBooking} onPay={handlePayRedirect} />} />
+        <Route path="/payment" element={<PaymentPage />} />
+        <Route path="/tariffs" element={<TariffsPage />} />
         <Route path="/oferta" element={<LegalPage content={PublicOffer} title="Договір оферти" />} />
         <Route path="/konfidenciinist" element={<LegalPage content={PrivacyPolicy} title="Політика конфіденційності" />} />
         <Route path="/povernenya" element={<LegalPage content={RefundPolicy} title="Повернення та оплата" />} />
@@ -94,13 +112,6 @@ function MainApp() {
       {!isAdmin && <ChatWidget />}
 
       <AnimatePresence>
-        {paymentData && (
-          <PaymentModal
-            data={paymentData}
-            onClose={() => setPaymentData(null)}
-            onOpenLegal={openLegal}
-          />
-        )}
         {isAuthOpen && <AuthModal onClose={() => setIsAuthOpen(false)} />}
         {isCabinetOpen && <CabinetModal onClose={() => setIsCabinetOpen(false)} />}
         <LegalModal 

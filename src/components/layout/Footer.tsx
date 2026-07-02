@@ -83,6 +83,13 @@ export default function Footer({ onOpenLegal }: FooterProps) {
                 <RefreshCcw size={14} className="group-hover:text-brand-yellow" />
                 <span>Повернення та оплата</span>
               </button>
+              <a 
+                href="/tariffs"
+                className="flex items-center gap-3 text-brand-muted hover:text-brand-yellow transition-colors text-sm group"
+              >
+                <FileText size={14} className="group-hover:text-brand-yellow" />
+                <span>Тарифи та ціни</span>
+              </a>
             </div>
           </div>
 
