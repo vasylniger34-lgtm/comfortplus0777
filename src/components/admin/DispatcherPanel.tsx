@@ -352,6 +352,31 @@ export default function DispatcherPanel({ adminName = 'Диспетчер', role
       setSavingCellId(`draft_${timeKey}`);
       const crewToUse = activeTab === 'всі' || activeTab === 'водії' || activeTab === 'звіт' ? '06:20' : activeTab;
       
+      // Авто-визначення призначеного водія
+      let autoDriverName = draft.driver_name || null;
+      let autoDriverId = null;
+
+      if (!autoDriverName) {
+        const assigned = assignments.find(a => normalizeCrewName(a.crew) === normalizeCrewName(crewToUse));
+        if (assigned) {
+          const drv = drivers.find(d => d.id === assigned.driver_id || d.name === assigned.driver_name);
+          if (drv) {
+            autoDriverName = drv.name;
+            autoDriverId = drv.id;
+          } else if (assigned.driver_name) {
+            autoDriverName = assigned.driver_name;
+            autoDriverId = assigned.driver_id || null;
+          }
+        }
+        if (!autoDriverName) {
+          const existingWithDriver = bookings.find(b => normalizeCrewName(b.crew) === normalizeCrewName(crewToUse) && b.driver_name);
+          if (existingWithDriver) {
+            autoDriverName = existingWithDriver.driver_name;
+            autoDriverId = existingWithDriver.driver_id || null;
+          }
+        }
+      }
+
       const newBookingPayload = {
         bus_date: selectedDate,
         date: selectedDate,
@@ -369,8 +394,8 @@ export default function DispatcherPanel({ adminName = 'Диспетчер', role
         pickup_location: draft.pickup_location || '',
         crew: crewToUse,
         status: 'підтверджено',
-        driver_name: draft.driver_name || null,
-        driver_id: null,
+        driver_name: autoDriverName,
+        driver_id: autoDriverId,
         updated_by: adminName
       };
 

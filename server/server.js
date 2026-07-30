@@ -400,8 +400,37 @@ app.post('/api/bookings', async (req, res) => {
   try {
     const finalStatus = status || 'active';
     const id = 'bk_' + Date.now() + Math.random().toString(36).substr(2, 4);
-    const f_driver_name = req.body.driver_name || null;
-    const f_driver_id = req.body.driver_id || null;
+    let f_driver_name = req.body.driver_name || null;
+    let f_driver_id = req.body.driver_id || null;
+
+    if (!f_driver_name) {
+      const cs = await dbQuery.get(
+        'SELECT cs.driver_id, dp.name as driver_name FROM crew_schedules cs LEFT JOIN driver_profiles dp ON cs.driver_id = dp.id WHERE cs.date = ? AND cs.crew_name = ?',
+        [f_date, finalCrewNorm]
+      );
+      if (cs && cs.driver_name) {
+        f_driver_name = cs.driver_name;
+        f_driver_id = cs.driver_id;
+      } else {
+        const da = await dbQuery.get(
+          'SELECT da.driver_id, dp.name as driver_name FROM driver_assignments da LEFT JOIN driver_profiles dp ON da.driver_id = dp.id WHERE da.date = ? AND da.crew = ?',
+          [f_date, finalCrewNorm]
+        );
+        if (da && da.driver_name) {
+          f_driver_name = da.driver_name;
+          f_driver_id = da.driver_id;
+        } else {
+          const eb = await dbQuery.get(
+            'SELECT driver_name, driver_id FROM bookings WHERE bus_date = ? AND crew = ? AND driver_name IS NOT NULL AND driver_name != "" LIMIT 1',
+            [f_date, finalCrewNorm]
+          );
+          if (eb && eb.driver_name) {
+            f_driver_name = eb.driver_name;
+            f_driver_id = eb.driver_id;
+          }
+        }
+      }
+    }
 
     await dbQuery.run(
       `INSERT INTO bookings (
