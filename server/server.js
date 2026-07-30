@@ -609,7 +609,7 @@ app.post('/api/internal/trigger-reload', (req, res) => {
 
 const DEFAULT_CREW_SCHEDULES = [
   { crew_name: '05:50', car: 'Мерседес 1', run1_time: '05:50', run2_time: '08:10', run3_time: '11:10', run4_time: '14:10', run5_time: '', run6_time: '' },
-  { crew_name: '06:20', car: 'Мерседес 2', run1_time: '06:20', run2_time: '09:15', run3_time: '14:50', run4_time: '', run5_time: '', run6_time: '' },
+  { crew_name: '06:20', car: 'Мерседес 2', run1_time: '06:20', run2_time: '09:15', run3_time: '', run4_time: '', run5_time: '', run6_time: '' },
   { crew_name: '07:10', car: 'Мерседес 3', run1_time: '07:10', run2_time: '10:15', run3_time: '13:20', run4_time: '16:10', run5_time: '19:20' },
   { crew_name: '08:15', car: 'Мерседес 4', run1_time: '08:15', run2_time: '11:10', run3_time: '14:10', run4_time: '17:10', run5_time: '20:00' },
   { crew_name: '08:50', car: 'Мерседес 5', run1_time: '08:50', run2_time: '11:50', run3_time: '15:30', run4_time: '18:20' },

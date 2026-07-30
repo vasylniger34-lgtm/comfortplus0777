@@ -27,8 +27,7 @@ const CREW_SUB_RUNS: Record<string, { time: string; label: string }[]> = {
   ],
   '06:20': [
     { time: '06:20', label: '06:20 зі Східниці' },
-    { time: '09:15', label: '09:15 зі Львова' },
-    { time: '14:50', label: '14:50 зі Львова' }
+    { time: '09:15', label: '09:15 зі Львова' }
   ],
   '07:10': [
     { time: '07:10', label: '07:10 зі Східниці' },
