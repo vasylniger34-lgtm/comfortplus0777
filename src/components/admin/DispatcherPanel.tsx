@@ -393,23 +393,12 @@ export default function DispatcherPanel({ adminName = 'Диспетчер', role
       let autoDriverId = null;
 
       if (!autoDriverName) {
-        const assigned = assignments.find(a => normalizeCrewName(a.crew) === normalizeCrewName(crewToUse));
-        if (assigned) {
-          const drv = drivers.find(d => d.id === assigned.driver_id || d.name === assigned.driver_name);
-          if (drv) {
-            autoDriverName = drv.name;
-            autoDriverId = drv.id;
-          } else if (assigned.driver_name) {
-            autoDriverName = assigned.driver_name;
-            autoDriverId = assigned.driver_id || null;
-          }
-        }
-        if (!autoDriverName) {
-          const existingWithDriver = bookings.find(b => normalizeCrewName(b.crew) === normalizeCrewName(crewToUse) && b.driver_name);
-          if (existingWithDriver) {
-            autoDriverName = existingWithDriver.driver_name;
-            autoDriverId = existingWithDriver.driver_id || null;
-          }
+        const existingWithDriver = bookings.find(b => 
+          normalizeCrewName(b.crew) === normalizeCrewName(crewToUse) && b.driver_name
+        );
+        if (existingWithDriver) {
+          autoDriverName = existingWithDriver.driver_name;
+          autoDriverId = existingWithDriver.driver_id || null;
         }
       }
 
