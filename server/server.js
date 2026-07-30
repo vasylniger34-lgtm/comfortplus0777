@@ -618,6 +618,18 @@ const DEFAULT_CREW_SCHEDULES = [
   { crew_name: '12:00', car: 'Мерседес 8', run1_time: '12:00', run2_time: '14:50', run3_time: '17:40', run4_time: '20:40' }
 ];
 
+function getAltDate(dStr) {
+  if (!dStr) return dStr;
+  if (dStr.includes('.')) {
+    const parts = dStr.split('.');
+    if (parts.length === 3) return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+  } else if (dStr.includes('-')) {
+    const parts = dStr.split('-');
+    if (parts.length === 3) return `${parts[2].padStart(2, '0')}.${parts[1].padStart(2, '0')}.${parts[0]}`;
+  }
+  return dStr;
+}
+
 // Отримати розклад на день
 app.get('/api/schedules', async (req, res) => {
   const { date } = req.query;
@@ -626,9 +638,10 @@ app.get('/api/schedules', async (req, res) => {
   }
 
   try {
+    const altDate = getAltDate(date);
     let rows = await dbQuery.all(
-      'SELECT * FROM crew_schedules WHERE date = ? ORDER BY created_at ASC',
-      [date]
+      'SELECT * FROM crew_schedules WHERE date = ? OR date = ? ORDER BY created_at ASC',
+      [date, altDate]
     );
 
     if (rows.length === 0) {
@@ -1141,7 +1154,9 @@ app.get('/api/drivers/by-pin/:pin', async (req, res) => {
 
 app.get('/api/assignments', async (req, res) => {
   try {
-    const assignments = await dbQuery.all('SELECT * FROM driver_assignments WHERE date = ?', [req.query.date]);
+    const d = req.query.date;
+    const alt = getAltDate(d);
+    const assignments = await dbQuery.all('SELECT * FROM driver_assignments WHERE date = ? OR date = ?', [d, alt]);
     res.json(assignments);
   } catch (err) {
     res.status(500).json({ error: 'Внутрішня помилка сервера' });

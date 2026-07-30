@@ -194,8 +194,18 @@ export default function DriverPanel({ driver, onLogout }: DriverPanelProps) {
         apiClient.getBookings({ date: selectedDate }).catch(() => [])
       ]);
 
+      const driverNameClean = (driver?.name || '').trim().toLowerCase();
+      const isMyDriver = (dName: string | null | undefined, dId: string | null | undefined) => {
+        if (dId && driver?.id && dId === driver.id) return true;
+        if (dName && driverNameClean) {
+          const clean = dName.trim().toLowerCase();
+          return clean === driverNameClean || clean.includes(driverNameClean) || driverNameClean.includes(clean);
+        }
+        return false;
+      };
+
       const myAssignments = schedules
-        .filter((s: any) => s.driver_id === driver?.id || s.driver_name === driver?.name)
+        .filter((s: any) => isMyDriver(s.driver_name, s.driver_id))
         .map((s: any) => ({
           id: s.id,
           date: s.date,
@@ -207,33 +217,52 @@ export default function DriverPanel({ driver, onLogout }: DriverPanelProps) {
 
       const myCrewsFromSchedules = myAssignments.map(a => a.crew);
       const myCrewsFromBookings = allBookings
-        .filter((b: any) => (b.driver_name && b.driver_name === driver?.name) || (b.driver_id && b.driver_id === driver?.id))
+        .filter((b: any) => isMyDriver(b.driver_name, b.driver_id))
         .map((b: any) => normalizeCrewName(b.crew));
 
-      const myCrews = Array.from(new Set([...myCrewsFromSchedules, ...myCrewsFromBookings]));
+      let myCrews = Array.from(new Set([...myCrewsFromSchedules, ...myCrewsFromBookings]));
       
+      // Якщо призначеного екіпажу немає, але є замовлення для водія, збираємо всі їхні екіпажі
+      if (myCrews.length === 0) {
+        const fallbackCrews = allBookings
+          .filter((b: any) => isMyDriver(b.driver_name, b.driver_id))
+          .map((b: any) => normalizeCrewName(b.crew));
+        myCrews = Array.from(new Set(fallbackCrews));
+      }
+
       setAssignedCrews(myCrews);
+
+      let activeCrew = normalizeCrewName(selectedCrew);
+      // Формуємо список замовлень водія
+      let targetBookings: any[] = [];
+      let assignment: any = null;
 
       if (myCrews.length > 0) {
         let activeCrew = normalizeCrewName(selectedCrew);
-        // Якщо обраний екіпаж не є серед призначених екіпажів, ставимо перший призначений
         if (!myCrews.includes(activeCrew)) {
           activeCrew = myCrews[0];
           setSelectedCrew(myCrews[0]);
         }
         
-        // Знаходимо авто для цього екіпажу
-        const assignment = myAssignments.find(a => a.crew === activeCrew);
+        assignment = myAssignments.find(a => a.crew === activeCrew);
         setAssignedCar(assignment?.car || null);
 
-        // Fetch bookings for this crew
         const data = await apiClient.getBookings({ date: selectedDate, crew: activeCrew });
-        const activeBookings = data.filter((b: any) => b.status === 'active');
-        
-        // Групуємо броні за часом, щоб водій бачив рейс
+        targetBookings = data.filter((b: any) => 
+          b.status !== 'скасовано' && b.status !== 'cancelled' &&
+          (isMyDriver(b.driver_name, b.driver_id) || (activeCrew && normalizeCrewName(b.crew) === activeCrew))
+        );
+      } else {
+        setAssignedCar(null);
+        targetBookings = allBookings.filter((b: any) => 
+          b.status !== 'скасовано' && b.status !== 'cancelled' && isMyDriver(b.driver_name, b.driver_id)
+        );
+      }
+
+      if (targetBookings.length > 0) {
         const grouped: Record<string, any> = {};
         
-        activeBookings.forEach((booking: any) => {
+        targetBookings.forEach((booking: any) => {
           const key = normalizeTime(booking.departure_time);
           if (!grouped[key]) {
             const isLviv = getRunDirectionForTime(assignment?.rawSchedule, key);
@@ -251,7 +280,6 @@ export default function DriverPanel({ driver, onLogout }: DriverPanelProps) {
         const carDetails = getCarDetails(assignment?.car || '');
         const totalSeats = carDetails ? carDetails.seats : 12;
 
-        // Для кожного рейсу обчислюємо місця та резерв
         Object.keys(grouped).forEach(timeKey => {
           const isLviv = getRunDirectionForTime(assignment?.rawSchedule, timeKey);
           const { seats, backupBookings } = allocateSeatSlots(grouped[timeKey].bookings, isLviv, totalSeats);
@@ -261,8 +289,6 @@ export default function DriverPanel({ driver, onLogout }: DriverPanelProps) {
         
         setRides(Object.values(grouped));
       } else {
-        // Якщо немає призначень для цього водія на цей день
-        setAssignedCar(null);
         setRides([]);
       }
     } catch (error) {
