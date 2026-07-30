@@ -537,17 +537,10 @@ export default function DispatcherPanel({ adminName = 'Диспетчер', role
 
     setIsLoading(true);
     try {
-      try {
-        await apiClient.createSchedule({
-          date: selectedDate,
-          crew_name: activeTab,
-          driver_id: driver.id,
-          driver_name: driver.name
-        });
-      } catch (e) {
-        console.warn('Розклад для водія вже існує або оновлено');
-      }
+      // 1. Зберігаємо призначення на сервері
+      await apiClient.assignDriver(driver.id, '', activeTab, selectedDate).catch(e => console.warn(e));
 
+      // 2. Оновлюємо всі бронювання цього рейсу
       await Promise.all(
         crewBookings.map(b => 
           apiClient.updateBooking(b.id, { 
@@ -558,14 +551,8 @@ export default function DispatcherPanel({ adminName = 'Диспетчер', role
         )
       );
 
-      driverService.saveAssignment({
-        id: `asg_${Date.now()}`,
-        date: selectedDate,
-        crew: activeTab,
-        driver_id: driver.id,
-        driver_name: driver.name,
-        car: ''
-      });
+      // 3. Синхронізуємо з локальним сервісом
+      await driverService.assignDriver(driver.id, '', activeTab, selectedDate).catch(e => console.warn(e));
 
       setBookings(prev => prev.map(b => {
         const isCrewMatch = activeTab === 'всі' || normalizeCrewName(b.crew) === normalizeCrewName(activeTab);

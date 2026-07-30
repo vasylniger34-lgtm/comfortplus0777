@@ -136,6 +136,10 @@ export const driverService = {
     }
   },
 
+  async saveAssignment(assignment: any): Promise<boolean> {
+    return this.assignDriver(assignment.driver_id, assignment.car || '', assignment.crew, assignment.date);
+  },
+
   // 6. Пошук водія за PIN-кодом
   async getDriverByPin(pin: string): Promise<DriverProfile | null> {
     const drivers = await this.getDrivers();

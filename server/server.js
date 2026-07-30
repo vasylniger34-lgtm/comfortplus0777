@@ -1168,6 +1168,16 @@ app.post('/api/assignments', async (req, res) => {
           [id, driver_id, car, normCrew, date]
         );
       }
+      if (driver_id) {
+        const drv = await dbQuery.get('SELECT name FROM driver_profiles WHERE id = ?', [driver_id]);
+        if (drv && drv.name) {
+          await dbQuery.run(
+            'UPDATE bookings SET driver_name = ?, driver_id = ? WHERE bus_date = ? AND crew = ?',
+            [drv.name, driver_id, date, normCrew]
+          );
+          io.emit('bookings_changed');
+        }
+      }
     }
     io.emit('assignments_changed');
     res.json({ success: true });
