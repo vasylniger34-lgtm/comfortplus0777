@@ -33,15 +33,13 @@ const CREW_SUB_RUNS: Record<string, { time: string; label: string }[]> = {
     { time: '07:10', label: '07:10 зі Східниці' },
     { time: '10:15', label: '10:15 зі Львова' },
     { time: '13:20', label: '13:20 зі Східниці' },
-    { time: '16:10', label: '16:10 зі Львова' },
-    { time: '19:20', label: '19:20 зі Східниці' }
+    { time: '16:10', label: '16:10 зі Львова' }
   ],
   '08:15': [
     { time: '08:15', label: '08:15 зі Східниці' },
     { time: '11:10', label: '11:10 зі Львова' },
     { time: '14:10', label: '14:10 зі Східниці' },
-    { time: '17:10', label: '17:10 зі Львова' },
-    { time: '20:00', label: '20:00 зі Львова' }
+    { time: '17:10', label: '17:10 зі Львова' }
   ],
   '08:50': [
     { time: '08:50', label: '08:50 зі Східниці' },
@@ -65,7 +63,7 @@ const CREW_SUB_RUNS: Record<string, { time: string; label: string }[]> = {
     { time: '12:00', label: '12:00 зі Східниці' },
     { time: '14:50', label: '14:50 зі Львова' },
     { time: '17:40', label: '17:40 зі Східниці' },
-    { time: '20:20', label: '20:20 зі Львова' }
+    { time: '20:40', label: '20:40 зі Львова' }
   ]
 };
 
@@ -140,6 +138,44 @@ export default function DispatcherPanel({ adminName = 'Диспетчер', role
   const [newDriverPhone, setNewDriverPhone] = useState('');
   const [newDriverPin, setNewDriverPin] = useState('');
   const [driverError, setDriverError] = useState('');
+
+  // Стан для створення власних під-рейсів
+  const [customSubRunsMap, setCustomSubRunsMap] = useState<Record<string, { time: string; label: string }[]>>(() => {
+    try {
+      const saved = localStorage.getItem('comfort_custom_subruns');
+      return saved ? JSON.parse(saved) : {};
+    } catch (e) {
+      return {};
+    }
+  });
+  const [showAddSubRunModal, setShowAddSubRunModal] = useState(false);
+  const [newSubRunTime, setNewSubRunTime] = useState('');
+  const [newSubRunDirection, setNewSubRunDirection] = useState<'skhidnytsia' | 'lviv'>('skhidnytsia');
+
+  const handleAddCustomSubRun = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newSubRunTime.trim()) return;
+    const timeNorm = normalizeTime(newSubRunTime.trim());
+    const label = newSubRunDirection === 'skhidnytsia' ? `${timeNorm} зі Східниці` : `${timeNorm} зі Львова`;
+    const crewKey = activeTab === 'водії' || activeTab === 'звіт' ? '05:50' : activeTab;
+
+    setCustomSubRunsMap(prev => {
+      const existing = prev[crewKey] || [];
+      if (existing.some(r => r.time === timeNorm)) return prev;
+      const nextMap = {
+        ...prev,
+        [crewKey]: [...existing, { time: timeNorm, label }]
+      };
+      try {
+        localStorage.setItem('comfort_custom_subruns', JSON.stringify(nextMap));
+      } catch (err) {}
+      return nextMap;
+    });
+
+    setNewSubRunTime('');
+    setShowAddSubRunModal(false);
+    showToast(`Новий під-рейс ${label} успішно додано!`, 'success');
+  };
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setNotification({ message, type });
@@ -220,7 +256,8 @@ export default function DispatcherPanel({ adminName = 'Диспетчер', role
       return false;
     })();
 
-    let currentSubRuns = [...(CREW_SUB_RUNS[activeTab] || [])];
+    const customForTab = customSubRunsMap[activeTab] || [];
+    let currentSubRuns = [...(CREW_SUB_RUNS[activeTab] || []), ...customForTab];
     if (isSunday) {
       if (activeTab === '05:50' || activeTab === '12:00' || activeTab === '08:15' || activeTab === 'всі') {
         currentSubRuns.push(
@@ -884,6 +921,15 @@ export default function DispatcherPanel({ adminName = 'Диспетчер', role
                 </div>
               )}
 
+              {/* ➕ КНОПКА СТВОРЕННЯ ВЛАСНОГО ПІД-РЕЙСУ */}
+              <button
+                onClick={() => setShowAddSubRunModal(true)}
+                className="flex items-center gap-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 px-3 py-1 rounded-lg text-xs font-bold transition-all shadow"
+              >
+                <Plus size={14} className="text-amber-400" />
+                <span>+ Створити під-рейс (час)</span>
+              </button>
+
               <div className="font-mono text-[11px] text-brand-yellow bg-brand-yellow/10 border border-brand-yellow/30 px-2.5 py-0.5 rounded font-bold">
                 Синхронізація з водієм: ⚡ LIVE
               </div>
@@ -1282,6 +1328,81 @@ export default function DispatcherPanel({ adminName = 'Диспетчер', role
           </div>
         )}
       </main>
+
+      {/* МОДАЛЬНЕ ВІКНО СТВОРЕННЯ ВЛАСНОГО ПІД-РЕЙСУ */}
+      {showAddSubRunModal && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-brand-surface border border-brand-border rounded-xl p-5 w-full max-w-md shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-brand-border pb-3">
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <Clock className="text-brand-yellow" size={18} />
+                <span>Створити новий під-рейс ({activeTab === 'всі' ? 'Загальний' : `Рейс ${activeTab}`})</span>
+              </h3>
+              <button onClick={() => setShowAddSubRunModal(false)} className="text-brand-muted hover:text-white">
+                <X size={18} />
+              </button>
+            </div>
+            
+            <form onSubmit={handleAddCustomSubRun} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-brand-muted mb-1">Час відправлення (наприклад 15:30 чи 18:00):</label>
+                <input
+                  type="text"
+                  placeholder="15:30"
+                  value={newSubRunTime}
+                  onChange={e => setNewSubRunTime(e.target.value)}
+                  className="w-full bg-brand-dark border border-brand-border rounded-lg px-3 py-2 text-white font-mono text-sm focus:outline-none focus:border-brand-yellow"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-brand-muted mb-1">Напрямок рейсу:</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setNewSubRunDirection('skhidnytsia')}
+                    className={`py-2 px-3 rounded-lg text-xs font-bold border transition-colors ${
+                      newSubRunDirection === 'skhidnytsia'
+                        ? 'bg-brand-yellow text-brand-dark border-brand-yellow'
+                        : 'bg-brand-dark text-brand-muted border-brand-border'
+                    }`}
+                  >
+                    зі Східниці (у Львів)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNewSubRunDirection('lviv')}
+                    className={`py-2 px-3 rounded-lg text-xs font-bold border transition-colors ${
+                      newSubRunDirection === 'lviv'
+                        ? 'bg-brand-yellow text-brand-dark border-brand-yellow'
+                        : 'bg-brand-dark text-brand-muted border-brand-border'
+                    }`}
+                  >
+                    зі Львова (у Східницю)
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-brand-border">
+                <button
+                  type="button"
+                  onClick={() => setShowAddSubRunModal(false)}
+                  className="px-4 py-2 rounded-lg text-xs font-bold bg-brand-card text-brand-muted hover:text-white"
+                >
+                  Скасувати
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-lg text-xs font-bold bg-brand-yellow text-brand-dark hover:bg-yellow-400 shadow"
+                >
+                  Створити під-рейс
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
