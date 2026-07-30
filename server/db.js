@@ -76,10 +76,15 @@ db.serialize(() => {
       passenger_phone TEXT NOT NULL,
       pickup_location TEXT,
       crew TEXT NOT NULL,
+      driver_name TEXT,
+      driver_id TEXT,
       updated_by TEXT DEFAULT 'Клієнт',
       created_at TEXT DEFAULT (datetime('now', 'localtime'))
     )
   `);
+
+  db.run(`ALTER TABLE bookings ADD COLUMN driver_name TEXT`, () => {});
+  db.run(`ALTER TABLE bookings ADD COLUMN driver_id TEXT`, () => {});
 
   // 3. Профілі водіїв
   db.run(`

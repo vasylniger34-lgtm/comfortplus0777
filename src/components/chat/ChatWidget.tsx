@@ -12,7 +12,7 @@ type Message = {
 };
 
 const BOT_REPLIES: Record<string, string> = {
-  default: 'Добрий день! Я бот підтримки Comfort Plus 0777. Чим можу допомогти?\n\nЗапитайте мене про:\n• Розклад рейсів\n• Ціни на квитки\n• Маршрути\n• Бронювання (тільки за телефоном)',
+  default: 'Добрий день! Напишіть ваше питання, і наш адміністратор відповість вам найближчим часом.',
   ціна: 'Ціна залежить від маршруту:\n🚌 Львів → Стебник — 200 грн\n🚌 Львів → Трускавець — 230 грн\n🚌 Львів → Борислав — 250 грн\n🚌 Львів → Східниця — 350 грн',
   розклад: 'Рейси відправляються щодня з Східниці починаючи з 05:50. Останній рейс о 20:40. З Львова — відповідно після прибуття. Перевірте блок "Розклад" на сторінці!',
   маршрут: 'Наш маршрут: Львів ↔ Стебник ↔ Трускавець ↔ Борислав ↔ Східниця. Зупинки по запиту!',
@@ -156,8 +156,6 @@ export default function ChatWidget() {
     
     setMessages(prev => [...prev, userMsg]);
     setInput('');
-    setTyping(true);
-
     try {
       await apiClient.sendChatMessage(sessionId, text, false);
     } catch (err) {
@@ -184,27 +182,6 @@ export default function ChatWidget() {
     } catch (e) {
       console.error('Telegram error', e);
     }
-
-    setTimeout(() => {
-      const replyText = getBotReply(text);
-      if (replyText !== BOT_REPLIES.default) {
-        const alreadyNotified = messages.some(m => m.text.includes('надіслано диспетчеру'));
-        
-        if (replyText.includes('надіслано диспетчеру') && alreadyNotified) {
-            setTyping(false);
-            return;
-        }
-
-        const botMsg: Message = {
-          id: (Date.now() + 1).toString(),
-          text: replyText,
-          from: 'bot',
-          ts: new Date(),
-        };
-        setMessages(prev => [...prev, botMsg]);
-      }
-      setTyping(false);
-    }, 1200);
   };
 
   const quickReplies = ['Розклад', 'Ціни', 'Маршрут', 'Бронювання'];
@@ -337,24 +314,7 @@ export default function ChatWidget() {
                     <div ref={messagesEndRef} />
                   </div>
 
-                  {/* Quick replies */}
-                  <div className="px-3 pt-2 pb-1 flex gap-2 no-scrollbar overflow-x-auto border-t border-brand-border/50 bg-brand-surface/20">
-                    {quickReplies.map(qr => (
-                      <button
-                        key={qr}
-                        onClick={() => {
-                          setInput(qr);
-                          setTimeout(() => {
-                              const btn = document.getElementById('chat-send-btn');
-                              btn?.click();
-                          }, 10);
-                        }}
-                        className="flex-shrink-0 text-xs px-3 py-1.5 rounded-full border border-brand-yellow/30 text-brand-yellow hover:bg-brand-yellow/10 transition-all"
-                      >
-                        {qr}
-                      </button>
-                    ))}
-                  </div>
+
 
                   {/* Input */}
                   <div className="p-3 border-t border-brand-border">

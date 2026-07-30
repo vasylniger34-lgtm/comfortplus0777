@@ -22,3 +22,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Scratch & DB
+scratch/
+*.db
+*.db-wal
+*.db-shm
+.env

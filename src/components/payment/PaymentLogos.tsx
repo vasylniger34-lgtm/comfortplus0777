@@ -7,10 +7,10 @@ interface PaymentLogosProps {
 
 export default function PaymentLogos({ className = '', variant = 'footer' }: PaymentLogosProps) {
   const logos = [
-    { name: 'Visa', url: 'https://upload.wikimedia.org/wikipedia/commons/d/d6/Visa_2021.svg' },
+    { name: 'Visa', url: 'https://upload.wikimedia.org/wikipedia/commons/5/5c/Visa_Inc._logo_(2021–present).svg' },
     { name: 'Mastercard', url: 'https://upload.wikimedia.org/wikipedia/commons/2/2a/Mastercard-logo.svg' },
-    { name: 'Portmone', url: 'https://www.portmone.com.ua/r3/images/logo.svg' },
-    { name: 'Prostir', url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Prostir_Logo.svg/512px-Prostir_Logo.svg.png' },
+    { name: 'Portmone', url: 'https://upload.wikimedia.org/wikipedia/commons/c/c4/Portmone_logo.svg' },
+    { name: 'Prostir', url: 'https://upload.wikimedia.org/wikipedia/commons/a/a6/Logo_PROSTIR.png' },
     { name: 'GPay', url: 'https://upload.wikimedia.org/wikipedia/commons/f/f2/Google_Pay_Logo.svg' },
     { name: 'ApplePay', url: 'https://upload.wikimedia.org/wikipedia/commons/b/b0/Apple_Pay_logo.svg' }
   ];

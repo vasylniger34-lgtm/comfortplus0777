@@ -34,21 +34,10 @@ export default function AdminPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-
-    // Код для головного диспетчера (3110)
-    if (code === '3110' || code === '8254') {
-      setRole('dispatcher');
-      setAdminName('Головний диспетчер');
-      localStorage.setItem('admin_role', 'dispatcher');
-      localStorage.setItem('admin_name', 'Головний диспетчер');
-      setError('');
-      setCode('');
-      return;
-    }
-
     setIsLoading(true);
+
     try {
-      // 1. Спроба авторизації через сервер для диспетчерів (1971, 0706, 0707 тощо)
+      // Спочатку пробуємо авторизувати як диспетчера через API
       try {
         const disp = await apiClient.loginDispatcher(code);
         if (disp) {
@@ -61,40 +50,28 @@ export default function AdminPage() {
             setCode('');
             return;
           } else {
-            setRole('junior_dispatcher');
-            setAdminName(disp.name);
-            localStorage.setItem('admin_role', 'junior_dispatcher');
-            localStorage.setItem('admin_name', disp.name);
+            // Молодший диспетчер - просимо ввести ім'я (пропонуємо ім'я з бази за замовчуванням)
+            setTempRole('junior_dispatcher');
+            setNameInput(disp.name);
+            setShowNamePrompt(true);
             setError('');
-            setCode('');
             return;
           }
         }
       } catch (dispErr) {
-        // Якщо не знайдено на сервері, перевіряємо статичні коди молодшого диспетчера
-      }
-
-      // 2. Статичні резервні PIN-коди молодшого диспетчера (8255, 4321, 1111, 2222, 1971, 0706, 0707)
-      if (['8255', '4321', '1111', '2222', '1971', '0706', '0707'].includes(code)) {
-        setTempRole('junior_dispatcher');
-        setShowNamePrompt(true);
-        setError('');
-        setIsLoading(false);
-        return;
-      }
-
-      // 3. Авторизація водія
-      const driver = await driverService.getDriverByPin(code);
-      if (driver) {
-        setActiveDriver(driver);
-        setRole('driver');
-        localStorage.setItem('admin_role', 'driver');
-        localStorage.setItem('active_driver', JSON.stringify(driver));
-        setError('');
-        setCode('');
-      } else {
-        setError('Невірний код доступу');
-        setCode('');
+        // Якщо не диспетчер, то пробуємо як водія
+        const driver = await driverService.getDriverByPin(code);
+        if (driver) {
+          setActiveDriver(driver);
+          setRole('driver');
+          localStorage.setItem('admin_role', 'driver');
+          localStorage.setItem('active_driver', JSON.stringify(driver));
+          setError('');
+          setCode('');
+        } else {
+          setError('Невірний код доступу');
+          setCode('');
+        }
       }
     } catch (err) {
       console.error(err);

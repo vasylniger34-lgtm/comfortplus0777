@@ -92,3 +92,127 @@ export const LEGAL_INFO = {
   taxGroup: 'Платник єдиного податку 3 група 5%',
 };
 
+export type CarDetail = {
+  plate: string;
+  seats: number;
+  description: string;
+  model: string;
+  colorName: string;
+  colorHex: string;
+};
+
+export let CARS_MAP: Record<string, CarDetail> = {
+  'вс 0777 оі': { 
+    plate: 'ВС 0777 ОІ', 
+    seats: 12, 
+    description: 'білий мерседес', 
+    model: 'Mercedes Sprinter', 
+    colorName: 'білий', 
+    colorHex: '#FFFFFF' 
+  },
+  'нс 0700 мо': { 
+    plate: 'НС 0700 МО', 
+    seats: 12, 
+    description: 'синій мерседес', 
+    model: 'Mercedes Sprinter', 
+    colorName: 'синій', 
+    colorHex: '#1E40AF' // Premium blue
+  },
+  'вс 1020 хе': { 
+    plate: 'ВС 1020 ХЕ', 
+    seats: 12, 
+    description: 'сірий мерседес', 
+    model: 'Mercedes Sprinter', 
+    colorName: 'сірий', 
+    colorHex: '#6B7280' // Premium gray
+  },
+  'вс 1030 хв': { 
+    plate: 'ВС 1030 ХВ', 
+    seats: 11, 
+    description: 'білий крафтер', 
+    model: 'Volkswagen Crafter', 
+    colorName: 'білий', 
+    colorHex: '#FFFFFF' 
+  },
+  'вс 1040 хв': { 
+    plate: 'ВС 1040 ХВ', 
+    seats: 9, 
+    description: 'білий мерседес', 
+    model: 'Mercedes Sprinter', 
+    colorName: 'білий', 
+    colorHex: '#FFFFFF' 
+  },
+  'вс 1070 хв': { 
+    plate: 'ВС 1070 ХВ', 
+    seats: 12, 
+    description: 'вишневий крафтер', 
+    model: 'Volkswagen Crafter', 
+    colorName: 'вишневий', 
+    colorHex: '#7A0016' // Cherry red
+  },
+  'вс 1090 хс': { 
+    plate: 'ВС 1090 ХС', 
+    seats: 9, 
+    description: 'білий крафтер', 
+    model: 'Volkswagen Crafter', 
+    colorName: 'білий', 
+    colorHex: '#FFFFFF' 
+  },
+  'вс 1080 хв': { 
+    plate: 'ВС 1080 ХВ', 
+    seats: 12, 
+    description: 'білий крафтер', 
+    model: 'Volkswagen Crafter', 
+    colorName: 'білий', 
+    colorHex: '#FFFFFF' 
+  },
+  'вс 1060 хв': { 
+    plate: 'ВС 1060 ХВ', 
+    seats: 12, 
+    description: 'білий мерседес', 
+    model: 'Mercedes Sprinter', 
+    colorName: 'білий', 
+    colorHex: '#FFFFFF' 
+  },
+};
+
+export let CARS_LIST = Object.values(CARS_MAP).map(c => c.plate);
+
+// Helper to normalize Ukrainian license plate letters from Latin homoglyphs to Cyrillic
+function normalizePlate(plate: string): string {
+  const map: Record<string, string> = {
+    'a': 'а', 'b': 'в', 'c': 'с', 'e': 'е', 'h': 'н', 'i': 'і', 'k': 'к', 'm': 'м', 'o': 'о', 'p': 'р', 't': 'т', 'x': 'х'
+  };
+  return plate
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .split('')
+    .map(char => map[char] || char)
+    .join('');
+}
+
+export function getCarDetails(plate?: string): CarDetail | null {
+  if (!plate) return null;
+  const key = normalizePlate(plate);
+  return CARS_MAP[key] || null;
+}
+
+export function updateCarsCache(newCars: CarDetail[]) {
+  const newMap: Record<string, CarDetail> = {};
+  newCars.forEach(car => {
+    const key = normalizePlate(car.plate);
+    newMap[key] = {
+      plate: car.plate,
+      seats: car.seats,
+      description: car.description || '',
+      model: car.model || '',
+      colorName: car.colorName || car.color_name || '',
+      colorHex: car.colorHex || car.color_hex || ''
+    };
+  });
+  CARS_MAP = newMap;
+  CARS_LIST = Object.values(newMap).map(c => c.plate);
+}
+
+

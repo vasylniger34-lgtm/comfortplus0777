@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { CheckCircle, MessageSquare, Bus, Phone, FileText, Gift, Lock, X } from 'lucide-react';
 import html2canvas from 'html2canvas';
@@ -6,42 +6,39 @@ import { jsPDF } from 'jspdf';
 import type { BookingData } from '../booking/BookingForm';
 import { useAuth } from '../../context/AuthContext';
 import { STOPS, CONTACTS } from '../../data/routes';
+import { apiClient } from '../../lib/apiClient';
 
 interface SuccessScreenProps {
   data: BookingData;
   onClose: () => void;
+  bookingId?: string;
 }
 
-export default function SuccessScreen({ data, onClose }: SuccessScreenProps) {
+export default function SuccessScreen({ data, onClose, bookingId }: SuccessScreenProps) {
   const ticketRef = useRef<HTMLDivElement>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [ticketNumber] = useState(`CP${Date.now().toString().slice(-6)}`);
   
-  const { user, register, addBooking } = useAuth();
+  const { user, register, reloadBookings } = useAuth();
   const [password, setPassword] = useState('');
   const [registered, setRegistered] = useState(false);
-  const [hasSavedBooking, setHasSavedBooking] = useState(false);
 
   const fromStop = STOPS.find(s => s.id === data.from);
   const toStop = STOPS.find(s => s.id === data.to);
 
-  useEffect(() => {
-    if (user && !hasSavedBooking) {
-      const save = async () => {
-        await addBooking(data);
-        setHasSavedBooking(true);
-      };
-      save();
-    }
-  }, [user, data, addBooking, hasSavedBooking]);
-
   const handleRegister = async () => {
     if (password.length >= 4) {
-      const newUser = await register(data.name, data.phone, password);
-      if (newUser) {
-        setRegistered(true);
-        await addBooking(data);
-        setHasSavedBooking(true);
+      try {
+        const newUser = await register(data.name, data.phone, password);
+        if (newUser) {
+          setRegistered(true);
+          if (bookingId) {
+            await apiClient.updateBooking(bookingId, { user_id: newUser.id });
+            await reloadBookings();
+          }
+        }
+      } catch (err) {
+        console.error('Помилка прив\'язки бронювання до нового користувача:', err);
       }
     }
   };
@@ -158,10 +155,14 @@ export default function SuccessScreen({ data, onClose }: SuccessScreenProps) {
               </div>
             </div>
 
-            <div className="border-t border-dashed border-brand-border pt-3 grid grid-cols-2 gap-2">
+            <div className="border-t border-dashed border-brand-border pt-3 grid grid-cols-2 gap-y-3 gap-x-2">
               <div>
                 <div className="text-brand-muted text-xs">Пасажир</div>
                 <div className="text-white text-sm font-medium">{data.name}</div>
+              </div>
+              <div>
+                <div className="text-brand-muted text-xs">Телефон</div>
+                <div className="text-white text-sm font-medium">{data.phone}</div>
               </div>
               <div>
                 <div className="text-brand-muted text-xs">Дата</div>
@@ -177,6 +178,12 @@ export default function SuccessScreen({ data, onClose }: SuccessScreenProps) {
                 <div className="text-brand-muted text-xs">Сплачено</div>
                 <div className="text-brand-yellow text-sm font-bold">{data.price} грн</div>
               </div>
+              {data.pickupLocation && (
+                <div>
+                  <div className="text-brand-muted text-xs">Зупинка посадки</div>
+                  <div className="text-white text-sm font-medium">{data.pickupLocation}</div>
+                </div>
+              )}
             </div>
           </div>
 

@@ -253,24 +253,38 @@ export default function CabinetModal({ onClose }: CabinetModalProps) {
                       </div>
                     </div>
 
-                    <div className="border-t border-dashed border-brand-border pt-4 grid grid-cols-2 gap-y-4 gap-x-2">
+                    <div className="border-t border-dashed border-brand-border pt-4 grid grid-cols-2 gap-y-3 gap-x-2">
                       <div>
                         <div className="text-brand-muted text-xs uppercase tracking-wider mb-0.5">Пасажир</div>
-                        <div className="text-white font-medium">{viewingTicket.name}</div>
+                        <div className="text-white font-medium">{viewingTicket.passenger_name || viewingTicket.name}</div>
+                      </div>
+                      <div>
+                        <div className="text-brand-muted text-xs uppercase tracking-wider mb-0.5">Телефон</div>
+                        <div className="text-white font-medium">{viewingTicket.passenger_phone || viewingTicket.phone || '—'}</div>
                       </div>
                       <div>
                         <div className="text-brand-muted text-xs uppercase tracking-wider mb-0.5">Дата</div>
                         <div className="text-white font-medium">
-                          {new Date(viewingTicket.date).toLocaleDateString('uk-UA', { day: 'numeric', month: 'long' })}
+                          {viewingTicket.bus_date || (viewingTicket.date ? new Date(viewingTicket.date).toLocaleDateString('uk-UA', { day: 'numeric', month: 'long' }) : '—')}
                         </div>
                       </div>
                       <div>
                         <div className="text-brand-muted text-xs uppercase tracking-wider mb-0.5">Місць</div>
-                        <div className="text-white font-medium">{viewingTicket.seats}</div>
+                        <div className="text-white font-medium">{viewingTicket.seats || 1}</div>
                       </div>
                       <div>
+                        <div className="text-brand-muted text-xs uppercase tracking-wider mb-0.5">Сума</div>
+                        <div className="text-brand-yellow font-bold">{viewingTicket.price ? `${viewingTicket.price} грн` : '—'}</div>
+                      </div>
+                      {(viewingTicket.pickup_location || viewingTicket.pickup) && (
+                        <div>
+                          <div className="text-brand-muted text-xs uppercase tracking-wider mb-0.5">Зупинка посадки</div>
+                          <div className="text-white font-medium text-xs">{viewingTicket.pickup_location || viewingTicket.pickup}</div>
+                        </div>
+                      )}
+                      <div>
                         <div className="text-brand-muted text-xs uppercase tracking-wider mb-0.5">Статус</div>
-                        <div className="text-brand-yellow font-bold uppercase text-xs tracking-widest">{viewingTicket.status}</div>
+                        <div className="text-brand-yellow font-bold uppercase text-xs tracking-widest">{viewingTicket.status || 'активне'}</div>
                       </div>
                     </div>
                   </div>

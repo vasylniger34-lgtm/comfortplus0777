@@ -1,26 +1,32 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Phone, ArrowRight, X, ChevronRight, CheckCircle2, Loader2, AlertCircle, ChevronDown, MapPin, Map } from 'lucide-react';
-import { getPrice, CONTACTS } from '../../data/routes';
+import { User, Phone, ArrowRight, X, ChevronRight, CheckCircle2, Loader2, ChevronDown, ChevronUp, MapPin } from 'lucide-react';
+import { getPrice, CONTACTS, getCarDetails } from '../../data/routes';
 import { useAuth } from '../../context/AuthContext';
 import { apiClient } from '../../lib/apiClient';
+import { normalizeTime, normalizeCrewName } from '../../utils/normalize';
 
 import DatePicker from './DatePicker';
 
 interface BookingFormProps {
   onPay: (data: BookingData) => void;
+  directionIndex: number | null;
+  setDirectionIndex: (dir: number | null) => void;
 }
 
 export interface BookingData {
   from: string;
   to: string;
   pickupLocation?: string;
+  dropoffLocation?: string;
   date: Date;
   name: string;
   phone: string;
   price: number;
   seats: number;
   departureTime: string;
+  directionIndex: number;
+  crew?: string;
 }
 
 const ROUTE_LVIV_TO_SKHIDNYTSIA = [
@@ -135,26 +141,32 @@ function CallUsModal({ onClose }: { onClose: () => void }) {
 
 // Мапінг часу до екіпажу
 const getCrewByTime = (time: string, isLvivDeparture: boolean) => {
+  const normTime = normalizeTime(time);
   if (isLvivDeparture) {
     const mapping: Record<string, string> = {
-      '09:00': '06:20', '14:50': '06:20', // Crew 1
-      '10:15': '07:10', '16:10': '07:10', // Crew 2
-      '11:10': '08:15', '18:20': '08:15', // Crew 3
-      '12:20': '09:30', '19:20': '09:30', // Crew 4
-      '13:10': '10:35', '20:00': '10:35', // Crew 5
-      '14:10': '11:10', '20:40': '11:10', // Crew 6
+      '08:10': '05:50', '14:10': '05:50',
+      '09:00': '06:20', '09:15': '06:20', '14:50': '06:20', '15:30': '06:20',
+      '10:15': '07:10', '16:10': '07:10',
+      '11:10': '08:15', '17:10': '08:15',
+      '11:50': '08:50', '18:20': '08:50',
+      '12:20': '09:30', '19:20': '09:30',
+      '13:10': '10:35', '20:00': '10:35',
+      '14:50': '12:00', '17:40': '12:00', '20:20': '12:00', '20:40': '12:00'
     };
-    return mapping[time] || '';
+    return normalizeCrewName(mapping[normTime] || normTime || '06:20');
   } else {
     const mapping: Record<string, string> = {
-      '06:20': '06:20', '12:00': '06:20', // Crew 1
-      '07:10': '07:10', '13:20': '07:10', // Crew 2
-      '08:15': '08:15', '15:30': '08:15', // Crew 3
-      '09:30': '09:30', '16:20': '09:30', // Crew 4
-      '10:35': '10:35', '17:00': '10:35', // Crew 5
-      '11:10': '11:10', '17:40': '11:10', // Crew 6
+      '05:50': '05:50', '11:10': '05:50',
+      '06:20': '06:20', '12:00': '06:20', '12:40': '06:20',
+      '07:10': '07:10', '13:20': '07:10',
+      '08:15': '08:15', '14:10': '08:15',
+      '08:50': '08:50', '15:30': '08:50',
+      '09:30': '09:30', '16:20': '09:30',
+      '10:35': '10:35', '17:00': '10:35',
+      '11:10': '11:10', '17:40': '11:10',
+      '12:00': '12:00'
     };
-    return mapping[time] || '';
+    return normalizeCrewName(mapping[normTime] || normTime || '06:20');
   }
 };
 
@@ -165,10 +177,35 @@ const getUADateString = (dateObj: Date) => {
   return `${d}.${m}.${y}`;
 };
 
-export default function BookingForm({ onPay }: BookingFormProps) {
+const MinibusIcon = ({ color, isSelected }: { color: string; isSelected: boolean }) => {
+  const strokeColor = color.toLowerCase() === '#ffffff' 
+    ? (isSelected ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.4)')
+    : 'none';
+  
+  return (
+    <svg 
+      width="24" 
+      height="14" 
+      viewBox="0 0 24 14" 
+      fill={color} 
+      stroke={strokeColor}
+      strokeWidth={strokeColor !== 'none' ? '0.75' : '0'}
+      className="inline-block align-middle rounded-sm"
+      style={{ filter: color.toLowerCase() === '#ffffff' ? 'drop-shadow(0px 1px 1px rgba(0,0,0,0.15))' : 'none' }}
+    >
+      <path d="M2 3C2 1.89543 2.89543 1 4 1H16.5C17.0673 1 17.6072 1.24131 17.9789 1.66068L21.7584 5.92298C21.9142 6.09893 22 6.32622 22 6.5623V11C22 12.1046 21.1046 13 20 13H4C2.89543 13 2 12.1046 2 11V3Z" />
+      <path d="M4.5 3H7.5V6H4.5V3Z" fill={isSelected ? '#facc15' : '#1e293b'} opacity="0.6" />
+      <path d="M9 3H13.5V6H9V3Z" fill={isSelected ? '#facc15' : '#1e293b'} opacity="0.6" />
+      <path d="M15 3H17.382C17.8427 3 18.2731 3.20894 18.5528 3.5682L20.2528 5.75391C20.4121 5.95874 20.5 6.2117 20.5 6.47188V6.5H15V3Z" fill={isSelected ? '#facc15' : '#1e293b'} opacity="0.6" />
+      <circle cx="6.5" cy="12.5" r="2" fill="#000" stroke="#fff" strokeWidth="0.5" />
+      <circle cx="17.5" cy="12.5" r="2" fill="#000" stroke="#fff" strokeWidth="0.5" />
+    </svg>
+  );
+};
+
+export default function BookingForm({ onPay, directionIndex, setDirectionIndex }: BookingFormProps) {
   const { user } = useAuth();
   
-  const [directionIndex, setDirectionIndex] = useState<number | null>(null);
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [date, setDate] = useState<Date | null>(null);
@@ -178,15 +215,16 @@ export default function BookingForm({ onPay }: BookingFormProps) {
   const [selectedTime, setSelectedTime] = useState('');
   const [pickupLocation, setPickupLocation] = useState('');
   const [dropoffLocation, setDropoffLocation] = useState('');
-  const [isPickupDropdownOpen, setIsPickupDropdownOpen] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showCallModal, setShowCallModal] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true);
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [statusMessage, setStatusMessage] = useState('');
 
   const [schedules, setSchedules] = useState<any[]>([]);
+  const [bookings, setBookings] = useState<any[]>([]);
   const [isLoadingSchedules, setIsLoadingSchedules] = useState(false);
 
   const price = getPrice(from, to);
@@ -200,58 +238,131 @@ export default function BookingForm({ onPay }: BookingFormProps) {
   }, [user]);
 
   useEffect(() => {
+    setFrom('');
+    setTo('');
+    setPickupLocation('');
+    setDropoffLocation('');
+    setSelectedTime('');
+    setIsCollapsed(true);
+  }, [directionIndex]);
+
+  const fetchSchedulesAndBookings = async () => {
+    if (!date) return;
+    try {
+      const dateStr = getUADateString(date);
+      const [schedulesData, bookingsData] = await Promise.all([
+        apiClient.getSchedules(dateStr),
+        apiClient.getBookings({ date: dateStr })
+      ]);
+      setSchedules(schedulesData || []);
+      setBookings(bookingsData || []);
+    } catch (err) {
+      console.error('Помилка завантаження даних рейсу/бронювань:', err);
+    }
+  };
+
+  useEffect(() => {
     if (!date) {
       setSchedules([]);
+      setBookings([]);
       return;
     }
-    const fetchSchedules = async () => {
-      setIsLoadingSchedules(true);
-      try {
-        const dateStr = getUADateString(date);
-        const data = await apiClient.getSchedules(dateStr);
-        setSchedules(data || []);
-      } catch (err) {
-        console.error('Помилка завантаження розкладу:', err);
-        setSchedules([]);
-      } finally {
-        setIsLoadingSchedules(false);
-      }
+
+    setIsLoadingSchedules(true);
+    fetchSchedulesAndBookings().finally(() => {
+      setIsLoadingSchedules(false);
+    });
+
+    const handleSchedulesChanged = () => fetchSchedulesAndBookings();
+    const handleBookingsChanged = () => fetchSchedulesAndBookings();
+
+    apiClient.socket.on('schedules_changed', handleSchedulesChanged);
+    apiClient.socket.on('bookings_changed', handleBookingsChanged);
+
+    return () => {
+      apiClient.socket.off('schedules_changed', handleSchedulesChanged);
+      apiClient.socket.off('bookings_changed', handleBookingsChanged);
     };
-    fetchSchedules();
   }, [date]);
 
+  const DEFAULT_SKHIDNYTSIA_TIMES = [
+    '05:50', '06:20', '07:10', '08:15', '08:50', '09:30', '10:35', '11:10', '12:00', 
+    '12:40', '13:20', '14:10', '15:30', '16:20', '17:00', '17:40'
+  ];
+
+  const DEFAULT_LVIV_TIMES = [
+    '08:10', '09:15', '10:15', '11:10', '11:50', '12:20', '13:10', '14:10', '14:50', 
+    '15:30', '16:10', '17:10', '18:20', '19:20', '20:00', '20:40'
+  ];
+
   const getDynamicDepartureTimes = () => {
-    if (!date || schedules.length === 0) return [];
+    if (!date) return [];
     
     const timesSet = new Set<string>();
-    schedules.forEach(s => {
-      if (directionIndex === 0) {
-        if (s.run2_time) timesSet.add(s.run2_time);
-        if (s.run4_time) timesSet.add(s.run4_time);
-      } else {
-        if (s.run1_time) timesSet.add(s.run1_time);
-        if (s.run3_time) timesSet.add(s.run3_time);
-      }
-    });
 
-    return Array.from(timesSet).sort((a, b) => {
-      const [hA, mA] = a.split(':').map(Number);
-      const [hB, mB] = b.split(':').map(Number);
-      return (hA * 60 + mA) - (hB * 60 + mB);
-    });
+    if (schedules && schedules.length > 0) {
+      schedules.forEach(s => {
+        if (directionIndex === 0) {
+          if (s.run2_time) timesSet.add(normalizeTime(s.run2_time));
+          if (s.run4_time) timesSet.add(normalizeTime(s.run4_time));
+          if (s.run6_time) timesSet.add(normalizeTime(s.run6_time));
+          if (s.run8_time) timesSet.add(normalizeTime(s.run8_time));
+          if (s.run10_time) timesSet.add(normalizeTime(s.run10_time));
+        } else {
+          if (s.run1_time) timesSet.add(normalizeTime(s.run1_time));
+          if (s.run3_time) timesSet.add(normalizeTime(s.run3_time));
+          if (s.run5_time) timesSet.add(normalizeTime(s.run5_time));
+          if (s.run7_time) timesSet.add(normalizeTime(s.run7_time));
+          if (s.run9_time) timesSet.add(normalizeTime(s.run9_time));
+        }
+      });
+    }
+
+    if (bookings && bookings.length > 0) {
+      bookings.forEach(b => {
+        const bTime = normalizeTime(b.departure_time);
+        const bFrom = (b.bus_from || b.from || '').toLowerCase();
+        if (directionIndex === 0 && bFrom.includes('львів')) {
+          timesSet.add(bTime);
+        } else if (directionIndex === 1 && !bFrom.includes('львів')) {
+          timesSet.add(bTime);
+        }
+      });
+    }
+
+    // У неділю (getDay() === 0) додаємо додаткові рейси: 18:15 зі Східниці та 21:00 зі Львова
+    const isSundayDate = date.getDay() === 0;
+
+    if (timesSet.size === 0) {
+      const defaults = directionIndex === 0 
+        ? (isSundayDate ? [...DEFAULT_LVIV_TIMES, '21:00'] : DEFAULT_LVIV_TIMES)
+        : (isSundayDate ? [...DEFAULT_SKHIDNYTSIA_TIMES, '18:15'] : DEFAULT_SKHIDNYTSIA_TIMES);
+      defaults.forEach(t => timesSet.add(t));
+    } else if (isSundayDate) {
+      if (directionIndex === 0) timesSet.add('21:00');
+      else timesSet.add('18:15');
+    }
+
+    return Array.from(timesSet)
+      .filter(t => t && t.trim() !== '')
+      .sort((a, b) => {
+        const [hA, mA] = a.split(':').map(Number);
+        const [hB, mB] = b.split(':').map(Number);
+        return (hA * 60 + mA) - (hB * 60 + mB);
+      });
   };
 
   const departureTimes = getDynamicDepartureTimes();
 
   const findCrewByTime = (time: string) => {
+    const cleanTime = normalizeTime(time);
     const found = schedules.find(s => {
-      if (directionIndex === 0) {
-        return s.run2_time === time || s.run4_time === time;
-      } else {
-        return s.run1_time === time || s.run3_time === time;
-      }
+      const runs = directionIndex === 0
+        ? [s.run2_time, s.run4_time, s.run6_time, s.run8_time, s.run10_time]
+        : [s.run1_time, s.run3_time, s.run5_time, s.run7_time, s.run9_time];
+      return runs.map(r => normalizeTime(r)).includes(cleanTime);
     });
-    return found ? found.crew_name : getCrewByTime(time, directionIndex === 0);
+    return normalizeCrewName(found ? found.crew_name : getCrewByTime(cleanTime, directionIndex === 0));
   };
 
   const isTimePassed = (time: string) => {
@@ -346,127 +457,171 @@ export default function BookingForm({ onPay }: BookingFormProps) {
     }
     setErrors({});
     
-    setIsSubmitting(true);
-    try {
-      const payloadPickupLoc = dropoffLocation 
-        ? `${pickupLocation} (Висадка: ${dropoffLocation})`
-        : pickupLocation;
+    const bookingData: BookingData = {
+      from,
+      to,
+      pickupLocation,
+      dropoffLocation,
+      date: date || new Date(),
+      name,
+      phone,
+      price,
+      seats,
+      departureTime: selectedTime,
+      directionIndex: directionIndex || 0,
+      crew: findCrewByTime(selectedTime)
+    };
 
-      const payload = {
-        from: currentRoute.find(s=>s.id===from)?.name || from,
-        to: currentRoute.find(s=>s.id===to)?.name || to,
-        pickup_location: payloadPickupLoc,
-        date: date ? getUADateString(date) : '',
-        name,
-        phone,
-        seats,
-        departure_time: selectedTime,
-        price: price * seats,
-        status: 'active',
-        crew: getCrewByTime(selectedTime, directionIndex === 0)
-      };
-
-      // Відправка в API
-      await apiClient.createBooking(payload);
-
-      // Відправка в Telegram
-      try {
-        const botToken = '8615069227:AAEiCjdj66e469JqarZxWSlfzFQs1jGkr4M';
-        const ADMIN_CHAT_IDS = ['8472692319', '8618558820'];
-        
-        const isHotelPickup = pickupLocation === 'ЗАБРАТИ З ГОТЕЛЮ';
-        const isHotelDropoff = dropoffLocation === 'ДОСТАВИТИ ДО ГОТЕЛЮ';
-        const isHotelTrip = isHotelPickup || isHotelDropoff;
-
-        const adminText = `🔔 Нове бронювання на сайті!\n\n👤 Клієнт: ${name}\n📞 Телефон: ${phone}\nМаршрут: ${payload.from} → ${payload.to}\n🚏 Зупинка посадки: ${pickupLocation}\n🚏 Зупинка висадки: ${dropoffLocation || 'Стандартна'}\n📅 Дата: ${payload.date}\n🕒 Час: ${selectedTime}\n👥 Місць: ${seats}\n💰 Сума: ${price * seats} грн${isHotelTrip ? ' (+ додаткова оплата за готель)' : ''}`;
-        
-        for (const adminId of ADMIN_CHAT_IDS) {
-          fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              chat_id: adminId,
-              text: adminText
-            })
-          });
-        }
-
-        // Окремий ордер для готелю
-        if (isHotelTrip) {
-          const hotelText = `🏨 УВАГА! ТРЕБА ПЕРЕТЕЛЕФОНУВАТИ! Забір/доставка з готелю\n\n👤 Клієнт: ${name}\n📞 Телефон: ${phone}\nМаршрут: ${payload.from} → ${payload.to}\n🚏 Зупинка посадки: ${pickupLocation}\n🚏 Зупинка висадки: ${dropoffLocation || '-'}\n📅 Дата: ${payload.date}\n🕒 Час: ${selectedTime}\n👥 Місць: ${seats}\n💰 Сума: ${price * seats} грн\n\n⚠️ Клієнт забронював рейс з ${isHotelPickup && isHotelDropoff ? 'забору з готелю та доставки в готель' : isHotelPickup ? 'забору з готелю' : 'доставки в готель'}. Треба перетелефонувати й узгодити ціну!`;
-          
-          for (const adminId of ADMIN_CHAT_IDS) {
-            fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                chat_id: adminId,
-                text: hotelText
-              })
-            });
-          }
-        }
-      } catch (e) {
-        console.error('Telegram error', e);
-      }
-
-      setSubmitStatus('success');
-      setStatusMessage('Дякуємо! Ваша заявка прийнята. Оскільки онлайн-оплата тимчасово недоступна, будь ласка, зателефонуйте нам для підтвердження броні.');
-
-    } catch (error) {
-      console.error('Supabase Error:', error);
-      setSubmitStatus('error');
-      setStatusMessage('Сталася помилка при збереженні. Спробуйте ще раз або зателефонуйте нам.');
-    } finally {
-      setIsSubmitting(false);
-    }
+    onPay(bookingData);
   };
+
+  const nearestTime = departureTimes.find(time => !isTimePassed(time)) || null;
 
   const AvailabilityCard = ({ time }: { time: string }) => {
     const passed = isTimePassed(time);
     if (passed) return null;
     const isSelected = selectedTime === time;
-    const seatsLeft = 8; // Заглушка
+    const isNearest = time === nearestTime;
+
+    const cleanTime = normalizeTime(time);
+    const schedule = schedules.find(s => {
+      const runs = directionIndex === 0
+        ? [s.run2_time, s.run4_time, s.run6_time, s.run8_time, s.run10_time]
+        : [s.run1_time, s.run3_time, s.run5_time, s.run7_time, s.run9_time];
+      return runs.map(r => normalizeTime(r)).includes(cleanTime);
+    });
+    const carDetails = getCarDetails(schedule?.car);
+    const crewName = findCrewByTime(time);
+    const totalSeats = carDetails ? carDetails.seats : 12;
+    const runBookings = bookings.filter(b => normalizeTime(b.departure_time) === cleanTime && normalizeCrewName(b.crew) === normalizeCrewName(crewName));
+
+    const isLviv = directionIndex === 0;
+    const routeStops = isLviv 
+      ? ['lviv', 'stebnik', 'truskavets', 'boryslav', 'skhidnytsia']
+      : ['skhidnytsia', 'boryslav', 'truskavets', 'stebnik', 'lviv'];
+      
+    const getStopId = (val: string) => {
+      if (!val) return '';
+      const valLower = val.toLowerCase();
+      if (valLower.includes('львів') || valLower === 'lviv') return 'lviv';
+      if (valLower.includes('стебник') || valLower === 'stebnik') return 'stebnik';
+      if (valLower.includes('трускавець') || valLower === 'truskavets') return 'truskavets';
+      if (valLower.includes('борислав') || valLower === 'boryslav') return 'boryslav';
+      if (valLower.includes('східниця') || valLower === 'skhidnytsia') return 'skhidnytsia';
+      return val;
+    };
+
+    const segments = [0, 0, 0, 0];
+    runBookings.forEach(b => {
+      const bFromId = getStopId(b.bus_from || b.from);
+      const bToId = getStopId(b.bus_to || b.to);
+      const fromIdx = routeStops.indexOf(bFromId);
+      const toIdx = routeStops.indexOf(bToId);
+      if (fromIdx !== -1 && toIdx !== -1 && fromIdx < toIdx) {
+        for (let i = fromIdx; i < toIdx; i++) {
+          segments[i] += b.seats || 0;
+        }
+      }
+    });
+
+    const newFromId = getStopId(from);
+    const newToId = getStopId(to);
+    const newFromIdx = routeStops.indexOf(newFromId);
+    const newToIdx = routeStops.indexOf(newToId);
+
+    let maxOccupancy = 0;
+    if (newFromIdx !== -1 && newToIdx !== -1 && newFromIdx < newToIdx) {
+      for (let i = newFromIdx; i < newToIdx; i++) {
+        if (segments[i] > maxOccupancy) {
+          maxOccupancy = segments[i];
+        }
+      }
+    } else {
+      maxOccupancy = Math.max(...segments);
+    }
+
+    const seatsLeft = Math.max(0, totalSeats - maxOccupancy);
+    const isFull = seatsLeft <= 0;
 
     return (
       <button
         type="button"
-        onClick={() => { setSelectedTime(time); setErrors(e => ({ ...e, time: '' })); }}
-        className={`relative flex items-center justify-between p-5 rounded-2xl border transition-all duration-200 text-left w-full
-          ${isSelected 
-            ? 'bg-brand-yellow text-brand-dark border-brand-yellow shadow-brand scale-[1.01]' 
-            : 'bg-brand-surface border-brand-border hover:border-brand-yellow/40 hover:bg-brand-yellow/5 group'
+        disabled={isFull}
+        onClick={() => { 
+          if (!isFull) {
+            setSelectedTime(time); 
+            setErrors(e => ({ ...e, time: '' })); 
+            setIsCollapsed(true);
+          }
+        }}
+        className={`relative flex items-center justify-between p-5 rounded-2xl border transition-all duration-300 cubic-bezier(0.16, 1, 0.3, 1) text-left w-full
+          ${isFull
+            ? 'bg-brand-surface/40 border-brand-border/30 opacity-60 cursor-not-allowed'
+            : isSelected 
+              ? 'bg-brand-yellow text-brand-dark border-brand-yellow shadow-[0_10px_30px_rgba(245,158,11,0.25)] scale-[1.015]' 
+              : 'bg-brand-surface border-brand-border hover:border-brand-yellow/50 hover:bg-brand-yellow/[0.03] hover:scale-[1.015] active:scale-[0.985] hover:shadow-[0_10px_30px_rgba(0,0,0,0.3),_0_0_20px_rgba(245,158,11,0.08)] group'
           }
         `}
       >
         <div className="flex items-center gap-6">
-            <div className={`p-3 rounded-xl flex items-center justify-center ${isSelected ? 'bg-brand-dark/10' : 'bg-brand-yellow/10 text-brand-yellow'}`}>
+            <div className={`p-3 rounded-xl flex items-center justify-center ${
+              isFull 
+                ? 'bg-brand-border/20 text-brand-muted' 
+                : isSelected ? 'bg-brand-dark/10' : 'bg-brand-yellow/10 text-brand-yellow'
+            }`}>
               <MapPin size={24} />
             </div>
             <div className="flex flex-col">
                 <div className="flex items-center gap-2 mb-1">
                     <span className="text-2xl font-display font-black">~{time}</span>
-                    <span className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded ${isSelected ? 'bg-brand-dark/10 opacity-70' : 'bg-brand-yellow/10 text-brand-yellow'}`}>
-                        {getCrewLabel(time)}
-                    </span>
+                    {isNearest && (
+                      <span className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded ${
+                        isSelected 
+                          ? 'bg-brand-dark/15 text-brand-dark opacity-90' 
+                          : 'bg-brand-yellow/15 text-brand-yellow border border-brand-yellow/20'
+                      }`}>
+                        НАЙБЛИЖЧИЙ
+                      </span>
+                    )}
                 </div>
-                <div className={`text-xs font-medium flex items-center gap-1.5 ${isSelected ? 'text-brand-dark/80' : 'text-brand-muted'}`}>
-                   Орієнтовний час готовності <span className="opacity-40">•</span> <User size={12} className="inline mr-0.5" />{seatsLeft} місць
+                <div className={`text-xs font-medium flex items-center flex-wrap gap-1.5 ${isSelected ? 'text-brand-dark/80' : 'text-brand-muted'}`}>
+                   Орієнтовний час готовності 
+                   {carDetails && (
+                     <>
+                       <span className="opacity-40">•</span> 
+                       <span className={`font-bold px-1.5 py-0.5 rounded text-[10px] border flex items-center gap-1.5 ${
+                         isSelected 
+                           ? 'bg-brand-dark/10 text-brand-dark border-brand-dark/20' 
+                           : 'bg-brand-surface/80 text-white border-brand-border/50'
+                       }`}>
+                         <MinibusIcon color={carDetails.colorHex} isSelected={isSelected} />
+                         {carDetails.plate}
+                       </span>
+                       <span className="opacity-80">({carDetails.model}, {carDetails.colorName})</span>
+                     </>
+                   )}
+                   <span className="opacity-40">•</span> 
+                   <User size={12} className="inline mr-0.5" />
+                   {isFull ? 'Немає місць' : `${seatsLeft} місць`}
                 </div>
             </div>
         </div>
         <div className="flex items-center gap-4">
             <div className="text-right hidden sm:block">
-                <div className={`text-[10px] uppercase font-black tracking-tighter ${isSelected ? 'text-brand-dark/60' : 'text-green-500'}`}>Статус: Вільний</div>
-                <div className={`text-xs font-bold ${isSelected ? 'text-brand-dark' : 'text-white'}`}>Готовий до виїзду</div>
+                <div className={`text-[10px] uppercase font-black tracking-tighter ${
+                  isFull 
+                    ? 'text-red-500' 
+                    : isSelected ? 'text-brand-dark/60' : 'text-green-500'
+                }`}>
+                  {isFull ? 'Статус: Зайнятий' : 'Статус: Вільний'}
+                </div>
+                <div className={`text-xs font-bold ${isSelected ? 'text-brand-dark' : 'text-white'}`}>
+                  {isFull ? 'Місця закінчились' : 'Готовий до виїзду'}
+                </div>
             </div>
-            <div className={`w-3 h-3 rounded-full pulse ${isSelected ? 'bg-brand-dark' : 'bg-green-500'}`} />
+            <div className={`w-3 h-3 rounded-full ${isFull ? 'bg-red-500' : 'pulse ' + (isSelected ? 'bg-brand-dark' : 'bg-green-500')}`} />
         </div>
-        {isSelected && (
+        {isSelected && !isFull && (
           <div className="absolute -top-2 -right-2 transform transition-transform">
              <div className="bg-brand-dark text-brand-yellow p-1.5 rounded-full shadow-lg border border-brand-yellow/20">
                 <ArrowRight size={16} />
@@ -542,8 +697,11 @@ export default function BookingForm({ onPay }: BookingFormProps) {
                     key={dir.id}
                     type="button"
                     onClick={() => { setDirectionIndex(dir.id); setFrom(''); setTo(''); setPickupLocation(''); setDropoffLocation(''); }}
-                    className={`p-6 rounded-2xl border-2 transition-all text-left group
-                      ${directionIndex === dir.id ? 'border-brand-yellow bg-brand-yellow/5' : 'border-brand-border hover:border-brand-yellow/40'}
+                    className={`p-6 rounded-2xl border-2 transition-all duration-300 cubic-bezier(0.16, 1, 0.3, 1) text-left group
+                      ${directionIndex === dir.id 
+                        ? 'border-brand-yellow bg-brand-yellow/[0.04] shadow-[0_10px_30px_rgba(245,158,11,0.12)] scale-[1.01]' 
+                        : 'border-brand-border hover:border-brand-yellow/50 hover:bg-brand-yellow/[0.02] hover:scale-[1.01] active:scale-[0.99]'
+                      }
                     `}
                   >
                     <div className="flex justify-between items-center mb-2">
@@ -683,8 +841,65 @@ export default function BookingForm({ onPay }: BookingFormProps) {
                       На вибрану дату немає доступних рейсів. Спробуйте іншу дату або зверніться до диспетчера за телефоном.
                     </div>
                   ) : (
-                    <div className="space-y-4">
-                      {departureTimes.map(time => <AvailabilityCard key={time} time={time} />)}
+                    <div className="space-y-0">
+                      <AnimatePresence initial={false}>
+                        {departureTimes.map(time => {
+                          const isSelected = selectedTime === time;
+                          const shouldShow = !selectedTime || !isCollapsed || isSelected;
+
+                          return (
+                            <motion.div
+                              key={time}
+                              initial={false}
+                              animate={shouldShow ? "visible" : "hidden"}
+                              variants={{
+                                visible: { 
+                                  height: 'auto', 
+                                  opacity: 1, 
+                                  scale: 1,
+                                  marginBottom: 16,
+                                  display: 'block',
+                                  transition: {
+                                    height: { type: 'spring', stiffness: 220, damping: 24 },
+                                    opacity: { duration: 0.2, ease: 'easeOut' },
+                                    scale: { duration: 0.2, ease: 'easeOut' }
+                                  }
+                                },
+                                hidden: { 
+                                  height: 0, 
+                                  opacity: 0, 
+                                  scale: 0.96,
+                                  marginBottom: 0,
+                                  transitionEnd: { display: 'none' },
+                                  transition: {
+                                    height: { type: 'spring', stiffness: 220, damping: 24 },
+                                    opacity: { duration: 0.15, ease: 'easeIn' },
+                                    scale: { duration: 0.15, ease: 'easeIn' }
+                                  }
+                                }
+                              }}
+                              style={{ overflow: 'hidden' }}
+                            >
+                              <AvailabilityCard time={time} />
+                            </motion.div>
+                          );
+                        })}
+                      </AnimatePresence>
+                      {selectedTime && (
+                        <div className="flex justify-end pt-2">
+                          <button
+                            type="button"
+                            onClick={() => setIsCollapsed(!isCollapsed)}
+                            className="text-brand-yellow hover:text-brand-gold text-sm font-semibold flex items-center gap-1.5 transition-colors"
+                          >
+                            {isCollapsed ? (
+                              <>Показати всі рейси ({departureTimes.length}) <ChevronDown size={16} /></>
+                            ) : (
+                              <>Згорнути список <ChevronUp size={16} /></>
+                            )}
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
                   {errors.time && <p className="text-red-400 text-xs mt-2">{errors.time}</p>}
@@ -744,9 +959,9 @@ export default function BookingForm({ onPay }: BookingFormProps) {
                         <div className="text-brand-muted text-xs uppercase tracking-widest font-black mb-1">Разом за {seats} пас.</div>
                         <div className="text-brand-yellow text-4xl font-display font-black leading-none">{price * seats} грн</div>
                       </div>
-                      <button type="submit" disabled={isSubmitting} className="btn-primary w-full md:w-auto px-12 py-5 text-lg flex items-center justify-center gap-3 group disabled:opacity-50">
+                      <button type="submit" disabled={isSubmitting} className="btn-primary w-full md:w-auto px-12 py-5 text-lg flex items-center justify-center gap-3 group disabled:opacity-50 shadow-brand hover:shadow-[0_10px_30px_rgba(245,158,11,0.35)] hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 ease-out">
                         {isSubmitting ? 'Зберігаємо...' : 'Забронювати'}
-                        {!isSubmitting && <ChevronRight size={20} className="group-hover:translate-x-1 transition-transform" />}
+                        {!isSubmitting && <ChevronRight size={20} className="group-hover:translate-x-1.5 transition-transform duration-300" />}
                       </button>
                     </div>
                   </div>

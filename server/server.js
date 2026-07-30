@@ -73,27 +73,104 @@ const getCrewByTime = (time, fromCity, toCity) => {
   const normTime = normalizeTime(time);
   if (isLvivDeparture) {
     const mapping = {
-      '09:00': '06:20', '14:50': '06:20',
+      '08:10': '05:50', '14:10': '05:50',
+      '09:00': '06:20', '09:15': '06:20', '14:50': '06:20', '15:30': '06:20',
       '10:15': '07:10', '16:10': '07:10',
-      '11:10': '08:15', '18:20': '08:15',
+      '11:10': '08:15', '17:10': '08:15',
+      '11:50': '08:50', '18:20': '08:50',
       '12:20': '09:30', '19:20': '09:30',
       '13:10': '10:35', '20:00': '10:35',
-      '14:10': '11:10', '20:40': '11:10',
+      '14:50': '12:00', '17:40': '12:00', '20:20': '12:00', '20:40': '12:00'
     };
-    return mapping[normTime] || normTime || '';
+    return mapping[normTime] || normTime || '06:20';
   } else {
     const mapping = {
-      '05:50': '05:50',
-      '06:20': '06:20', '12:00': '06:20',
+      '05:50': '05:50', '11:10': '05:50',
+      '06:20': '06:20', '12:00': '06:20', '12:40': '06:20',
       '07:10': '07:10', '13:20': '07:10',
-      '08:15': '08:15', '15:30': '08:15',
+      '08:15': '08:15', '14:10': '08:15',
+      '08:50': '08:50', '15:30': '08:50',
       '09:30': '09:30', '16:20': '09:30',
       '10:35': '10:35', '17:00': '10:35',
       '11:10': '11:10', '17:40': '11:10',
+      '12:00': '12:00'
     };
-    return mapping[normTime] || normTime || '';
+    return mapping[normTime] || normTime || '06:20';
   }
 };
+
+async function splitBookingIfMultiple(bookingId) {
+  try {
+    const booking = await dbQuery.get('SELECT * FROM bookings WHERE id = ?', [bookingId]);
+    if (!booking) return;
+
+    if (booking.seats > 1 && booking.status === 'active') {
+      const N = booking.seats;
+      const basePrice = Math.floor(booking.price / N);
+      const remainder = booking.price - (basePrice * N);
+
+      const baseName = booking.passenger_name.replace(/\s*\(Місце\s*\d+\)$/, '');
+      const firstPrice = basePrice + remainder;
+      const firstPassengerName = `${baseName} (Місце 1)`;
+
+      // Update the first booking (this one) to have 1 seat
+      await dbQuery.run(
+        `UPDATE bookings SET seats = 1, price = ?, passenger_name = ? WHERE id = ?`,
+        [firstPrice, firstPassengerName, bookingId]
+      );
+
+      // Insert N - 1 new bookings of 1 seat each
+      for (let i = 2; i <= N; i++) {
+        const newId = `${bookingId}_${i}`;
+        const newPassengerName = `${baseName} (Місце ${i})`;
+        
+        await dbQuery.run(
+          `INSERT INTO bookings (
+            id, user_id, bus_from, bus_to, bus_date, departure_time, 
+            seats, price, status, passenger_name, passenger_phone, 
+            pickup_location, crew, updated_by, is_paid_online, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            newId,
+            booking.user_id,
+            booking.bus_from,
+            booking.bus_to,
+            booking.bus_date,
+            booking.departure_time,
+            1,
+            basePrice,
+            booking.status,
+            newPassengerName,
+            booking.passenger_phone,
+            booking.pickup_location,
+            booking.crew,
+            booking.updated_by,
+            booking.is_paid_online,
+            booking.created_at
+          ]
+        );
+
+        // Update loyalty completed_rides for additional seats
+        if (booking.user_id) {
+          const user = await dbQuery.get('SELECT completed_rides FROM profiles WHERE id = ?', [booking.user_id]);
+          if (user) {
+            let newCompletedRides = user.completed_rides;
+            if (basePrice === 0) {
+              newCompletedRides = 0;
+            } else {
+              newCompletedRides += 1;
+            }
+            await dbQuery.run('UPDATE profiles SET completed_rides = ? WHERE id = ?', [newCompletedRides, booking.user_id]);
+          }
+        }
+      }
+      
+      console.log(`[Split Booking] Booking ${bookingId} split into ${N} individual bookings.`);
+    }
+  } catch (err) {
+    console.error(`[Split Booking] Error splitting booking ${bookingId}:`, err);
+  }
+}
 
 
 // ==========================================
@@ -203,7 +280,7 @@ app.post('/api/auth/update-balance', async (req, res) => {
 // 2. БРОНЮВАННЯ (BOOKINGS)
 // ==========================================
 
-// Отримати список відновлених бронювань з підтримкою обох моделей
+// Отримати список бронювань з підтримкою обох форматів дат та всіх статусів
 app.get('/api/bookings', async (req, res) => {
   const { user_id, date, crew } = req.query;
 
@@ -214,16 +291,28 @@ app.get('/api/bookings', async (req, res) => {
     if (user_id) {
       sql += ' AND user_id = ?';
       params.push(user_id);
-    } else {
-      sql += " AND status IN ('active', 'pending')";
     }
+
     if (date) {
-      sql += ' AND bus_date = ?';
-      params.push(date);
+      let altDate = date;
+      if (date.includes('-')) {
+        const parts = date.split('-');
+        if (parts.length === 3) {
+          altDate = `${parts[2]}.${parts[1]}.${parts[0]}`;
+        }
+      } else if (date.includes('.')) {
+        const parts = date.split('.');
+        if (parts.length === 3) {
+          altDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
+        }
+      }
+      sql += ' AND (bus_date = ? OR bus_date = ?)';
+      params.push(date, altDate);
     }
+
     if (crew) {
-      sql += ' AND crew = ?';
-      params.push(crew);
+      sql += ' AND (crew = ? OR crew = ?)';
+      params.push(crew, normalizeCrewName(crew));
     }
 
     sql += ' ORDER BY departure_time ASC, created_at DESC';
@@ -311,16 +400,21 @@ app.post('/api/bookings', async (req, res) => {
   try {
     const finalStatus = status || 'active';
     const id = 'bk_' + Date.now() + Math.random().toString(36).substr(2, 4);
+    const f_driver_name = req.body.driver_name || null;
+    const f_driver_id = req.body.driver_id || null;
+
     await dbQuery.run(
       `INSERT INTO bookings (
         id, user_id, bus_from, bus_to, bus_date, departure_time, 
         seats, price, status, passenger_name, passenger_phone, 
-        pickup_location, crew, updated_by, is_paid_online
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        pickup_location, crew, updated_by, is_paid_online,
+        driver_name, driver_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id, user_id, f_from, f_to, f_date, finalTime,
         seats, price, finalStatus, f_name, f_phone,
-        pickup_location, finalCrewNorm, updated_by || 'Клієнт', is_paid_online || 0
+        pickup_location, finalCrewNorm, updated_by || 'Клієнт', is_paid_online || 0,
+        f_driver_name, f_driver_id
       ]
     );
 
@@ -348,6 +442,10 @@ app.post('/api/bookings', async (req, res) => {
       phone: row.passenger_phone
     };
     
+    if (finalStatus === 'active') {
+      await splitBookingIfMultiple(id);
+    }
+
     // Сповіщення в реалтаймі
     io.emit('bookings_changed');
     
@@ -400,6 +498,9 @@ app.put('/api/bookings/:id', async (req, res) => {
     const updatedUserId = user_id !== undefined ? user_id : booking.user_id;
     const updatedIsPaidOnline = is_paid_online !== undefined ? is_paid_online : booking.is_paid_online;
 
+    const updatedDriverName = req.body.driver_name !== undefined ? req.body.driver_name : booking.driver_name;
+    const updatedDriverId = req.body.driver_id !== undefined ? req.body.driver_id : booking.driver_id;
+
     const normTime = normalizeTime(updatedTime);
     const normCrew = normalizeCrewName(updatedCrew);
 
@@ -408,12 +509,14 @@ app.put('/api/bookings/:id', async (req, res) => {
         status = ?, pickup_location = ?, seats = ?, price = ?, 
         departure_time = ?, crew = ?, bus_from = ?, bus_to = ?,
         bus_date = ?, passenger_name = ?, passenger_phone = ?,
-        updated_by = ?, user_id = ?, is_paid_online = ?
+        updated_by = ?, user_id = ?, is_paid_online = ?,
+        driver_name = ?, driver_id = ?
       WHERE id = ?`,
       [
         updatedStatus, updatedPickup, updatedSeats, updatedPrice, 
         normTime, normCrew, updatedFrom, updatedTo, 
-        updatedDate, updatedName, updatedPhone, updatedBy, updatedUserId, updatedIsPaidOnline, id
+        updatedDate, updatedName, updatedPhone, updatedBy, updatedUserId, updatedIsPaidOnline,
+        updatedDriverName, updatedDriverId, id
       ]
     );
 
@@ -424,6 +527,10 @@ app.put('/api/bookings/:id', async (req, res) => {
         const newBalance = user.balance + booking.price;
         await dbQuery.run('UPDATE profiles SET balance = ? WHERE id = ?', [newBalance, booking.user_id]);
       }
+    }
+
+    if (updatedStatus === 'active') {
+      await splitBookingIfMultiple(id);
     }
 
     const row = await dbQuery.get('SELECT * FROM bookings WHERE id = ?', [id]);
@@ -471,9 +578,16 @@ app.post('/api/internal/trigger-reload', (req, res) => {
 });
 
 
-// ==========================================
-// 2A. РОЗКЛАД ЕКІПАЖІВ (CREW SCHEDULES)
-// ==========================================
+const DEFAULT_CREW_SCHEDULES = [
+  { crew_name: '05:50', car: 'Мерседес 1', run1_time: '05:50', run2_time: '08:10', run3_time: '11:10', run4_time: '14:10', run5_time: '17:10', run6_time: '20:20' },
+  { crew_name: '06:20', car: 'Мерседес 2', run1_time: '06:20', run2_time: '09:15', run3_time: '12:00', run4_time: '14:50', run5_time: '17:40', run6_time: '20:40' },
+  { crew_name: '07:10', car: 'Мерседес 3', run1_time: '07:10', run2_time: '10:15', run3_time: '13:20', run4_time: '16:10', run5_time: '19:20' },
+  { crew_name: '08:15', car: 'Мерседес 4', run1_time: '08:15', run2_time: '11:10', run3_time: '14:10', run4_time: '17:10', run5_time: '20:00' },
+  { crew_name: '08:50', car: 'Мерседес 5', run1_time: '08:50', run2_time: '11:50', run3_time: '15:30', run4_time: '18:20' },
+  { crew_name: '09:30', car: 'Мерседес 6', run1_time: '09:30', run2_time: '12:20', run3_time: '16:20', run4_time: '19:20' },
+  { crew_name: '10:35', car: 'Мерседес 7', run1_time: '10:35', run2_time: '13:10', run3_time: '17:00', run4_time: '20:00' },
+  { crew_name: '12:00', car: 'Мерседес 8', run1_time: '12:00', run2_time: '14:50', run3_time: '17:40', run4_time: '20:20' }
+];
 
 // Отримати розклад на день
 app.get('/api/schedules', async (req, res) => {
@@ -483,10 +597,54 @@ app.get('/api/schedules', async (req, res) => {
   }
 
   try {
-    const rows = await dbQuery.all(
+    let rows = await dbQuery.all(
       'SELECT * FROM crew_schedules WHERE date = ? ORDER BY created_at ASC',
       [date]
     );
+
+    if (rows.length === 0) {
+      const isSunday = (() => {
+        let d;
+        if (date.includes('.')) {
+          const [day, month, year] = date.split('.').map(Number);
+          d = new Date(year, month - 1, day);
+        } else {
+          d = new Date(date);
+        }
+        return d.getDay() === 0;
+      })();
+
+      for (const def of DEFAULT_CREW_SCHEDULES) {
+        const id = 'sch_' + Date.now() + Math.random().toString(36).substr(2, 4);
+        let r5 = def.run5_time || '';
+        let r6 = def.run6_time || '';
+        let r7 = '';
+
+        if (isSunday) {
+          if (def.crew_name === '12:00') {
+            r5 = '18:15';
+            r6 = '20:20';
+            r7 = '21:00';
+          }
+        }
+
+        await dbQuery.run(
+          `INSERT INTO crew_schedules (
+            id, date, crew_name, driver_id, car, 
+            run1_time, run2_time, run3_time, run4_time, run5_time, run6_time, run7_time
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            id, date, def.crew_name, 'drv_default', def.car,
+            def.run1_time, def.run2_time, def.run3_time, def.run4_time, r5, r6, r7
+          ]
+        );
+      }
+      rows = await dbQuery.all(
+        'SELECT * FROM crew_schedules WHERE date = ? ORDER BY created_at ASC',
+        [date]
+      );
+    }
+
     res.json(rows);
   } catch (err) {
     console.error('Помилка отримання розкладу:', err);
@@ -1193,6 +1351,9 @@ async function processPayment(bookingId, amount, status) {
         }).catch(err => console.error('[Portmone Callback] Error sending hotel Telegram message:', err));
       }
     }
+
+    // Розділяємо бронювання, якщо куплено більше 1 місця
+    await splitBookingIfMultiple(bookingId);
 
     // Повідомляємо диспетчерську панель по Socket.io
     io.emit('bookings_changed');

@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Phone, MapPin, Clock, User, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Phone, MapPin, Clock, User, RefreshCw, ChevronLeft, ChevronRight, CreditCard } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
-import { driverService } from '../../lib/driverService';
+import { getCarDetails } from '../../data/routes';
+import { normalizeTime, normalizeCrewName } from '../../utils/normalize';
 
 interface DriverPanelProps {
   driver?: {
@@ -21,6 +22,160 @@ const getUADateString = (dateObj: Date) => {
   return `${d}.${m}.${y}`;
 };
 
+const SKHIDNYTSIA_TO_LVIV_ORDER = ['skhidnytsia', 'boryslav', 'truskavets', 'stebnik', 'lviv'];
+const LVIV_TO_SKHIDNYTSIA_ORDER = ['lviv', 'stebnik', 'truskavets', 'boryslav', 'skhidnytsia'];
+
+const ROUTE_LVIV_TO_SKHIDNYTSIA = ['Львів', 'Стебник', 'Трускавець', 'Борислав', 'Східниця'];
+const ROUTE_SKHIDNYTSIA_TO_LVIV = ['Східниця', 'Борислав', 'Трускавець', 'Стебник', 'Львів'];
+
+const STOP_NAMES: Record<string, string> = {
+  'lviv': 'Львів',
+  'stebnik': 'Стебник',
+  'truskavets': 'Трускавець',
+  'boryslav': 'Борислав',
+  'skhidnytsia': 'Східниця'
+};
+
+const getStopId = (val: string) => {
+  if (!val) return '';
+  const valLower = val.toLowerCase();
+  if (valLower.includes('львів') || valLower === 'lviv') return 'lviv';
+  if (valLower.includes('стебник') || valLower === 'stebnik') return 'stebnik';
+  if (valLower.includes('трускавець') || valLower === 'truskavets') return 'truskavets';
+  if (valLower.includes('борислав') || valLower === 'boryslav') return 'boryslav';
+  if (valLower.includes('східниця') || valLower === 'skhidnytsia') return 'skhidnytsia';
+  return val;
+};
+
+const isLvivDeparture = (time: string): boolean => {
+  const cleanTime = normalizeTime(time);
+  const lvivTimes = ['09:00', '10:15', '11:10', '12:20', '13:10', '14:10', '14:50', '16:10', '18:20', '19:20', '20:00', '20:40'];
+  return lvivTimes.includes(cleanTime);
+};
+
+const getRunDirectionForTime = (schedule: any, time: string): boolean => {
+  const cleanTime = normalizeTime(time);
+  if (schedule) {
+    const lvivRuns = [
+      schedule.run2_time,
+      schedule.run4_time,
+      schedule.run6_time,
+      schedule.run8_time,
+      schedule.run10_time
+    ].map(r => normalizeTime(r));
+    if (lvivRuns.includes(cleanTime)) {
+      return true;
+    }
+    const skhidRuns = [
+      schedule.run1_time,
+      schedule.run3_time,
+      schedule.run5_time,
+      schedule.run7_time,
+      schedule.run9_time
+    ].map(r => normalizeTime(r));
+    if (skhidRuns.includes(cleanTime)) {
+      return false;
+    }
+  }
+  return isLvivDeparture(cleanTime);
+};
+
+const getNormalizedCityName = (cityName: string): string => {
+  if (!cityName) return '';
+  const nameLower = cityName.toLowerCase();
+  if (nameLower.includes('львів') || nameLower === 'lviv') return 'Львів';
+  if (nameLower.includes('стебник') || nameLower === 'stebnik') return 'Стебник';
+  if (nameLower.includes('трускавець') || nameLower === 'truskavets') return 'Трускавець';
+  if (nameLower.includes('борислав') || nameLower === 'boryslav') return 'Борислав';
+  if (nameLower.includes('східниця') || nameLower === 'skhidnytsia') return 'Східниця';
+  return cityName;
+};
+
+const allocateSeatSlots = (runBookings: any[], isLvivDeparture: boolean, totalSeats: number = 12) => {
+  const route = isLvivDeparture ? ROUTE_LVIV_TO_SKHIDNYTSIA : ROUTE_SKHIDNYTSIA_TO_LVIV;
+
+  const seats = Array.from({ length: totalSeats }, (_, i) => ({
+    number: i + 1,
+    bookings: [] as any[]
+  }));
+
+  const backupBookings: any[] = [];
+
+  const sortedBookings = [...runBookings].sort((a, b) => (a.id || '').localeCompare(b.id || ''));
+
+  sortedBookings.forEach(booking => {
+    const normFrom = getNormalizedCityName(booking.bus_from || booking.from);
+    const normTo = getNormalizedCityName(booking.bus_to || booking.to);
+    let fromIdx = route.indexOf(normFrom);
+    let toIdx = route.indexOf(normTo);
+    
+    if (fromIdx === -1) fromIdx = 0;
+    if (toIdx === -1) toIdx = route.length - 1;
+
+    const requestedSeats = booking.seats || 1;
+    const allocatedSeatNumbers: number[] = [];
+
+    // Try to find a block of consecutive seats that can accommodate the whole booking
+    let blockStartIdx = -1;
+    outer: for (let startIdx = 0; startIdx <= totalSeats - requestedSeats; startIdx++) {
+      // Check each seat in the potential block
+      for (let offset = 0; offset < requestedSeats; offset++) {
+        const seatIdx = startIdx + offset;
+        const seat = seats[seatIdx];
+        const hasOverlap = seat.bookings.some(existing => {
+          const exNormFrom = getNormalizedCityName(existing.bus_from || existing.from);
+          const exNormTo = getNormalizedCityName(existing.bus_to || existing.to);
+          let exFromIdx = route.indexOf(exNormFrom);
+          let exToIdx = route.indexOf(exNormTo);
+          if (exFromIdx === -1) exFromIdx = 0;
+          if (exToIdx === -1) exToIdx = route.length - 1;
+
+          return Math.max(fromIdx, exFromIdx) < Math.min(toIdx, exToIdx);
+        });
+        if (hasOverlap) {
+          continue outer; // this block is not suitable
+        }
+      }
+      blockStartIdx = startIdx;
+      break outer;
+    }
+
+    if (blockStartIdx !== -1) {
+      // Allocate the whole block of seats for this booking
+      for (let offset = 0; offset < requestedSeats; offset++) {
+        const seatIdx = blockStartIdx + offset;
+        allocatedSeatNumbers.push(seatIdx);
+        seats[seatIdx].bookings.push({ ...booking, _temp: true });
+      }
+    }
+
+    if (allocatedSeatNumbers.length === requestedSeats) {
+      allocatedSeatNumbers.forEach((seatIdx, sIdx) => {
+        const list = seats[seatIdx].bookings;
+        const tempIdx = list.findIndex(x => x.id === booking.id && x._temp);
+        if (tempIdx !== -1) {
+          list[tempIdx] = {
+            ...booking,
+            seatSubIndex: sIdx + 1,
+            totalSeats: requestedSeats,
+            assignedSeatNumber: seatIdx + 1
+          };
+        }
+      });
+    } else {
+      seats.forEach(seat => {
+        seat.bookings = seat.bookings.filter(x => x.id !== booking.id);
+      });
+      backupBookings.push(booking);
+    }
+  });
+
+  return {
+    seats,
+    backupBookings
+  };
+};
+
 export default function DriverPanel({ driver, onLogout }: DriverPanelProps) {
   const [rides, setRides] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -33,17 +188,36 @@ export default function DriverPanel({ driver, onLogout }: DriverPanelProps) {
     setIsLoading(true);
     
     try {
-      // 1. Отримуємо призначені екіпажі для цього водія на selectedDate
-      const allAssignments = await driverService.getAssignments(selectedDate);
-      const myAssignments = allAssignments.filter(a => a.driver_id === driver?.id);
-      const myCrews = myAssignments.map(a => a.crew);
+      // 1. Отримуємо призначені екіпажі для цього водія з розкладу та бронювань
+      const [schedules, allBookings] = await Promise.all([
+        apiClient.getSchedules(selectedDate).catch(() => []),
+        apiClient.getBookings({ date: selectedDate }).catch(() => [])
+      ]);
+
+      const myAssignments = schedules
+        .filter((s: any) => s.driver_id === driver?.id || s.driver_name === driver?.name)
+        .map((s: any) => ({
+          id: s.id,
+          date: s.date,
+          crew: normalizeCrewName(s.crew_name || s.crew),
+          driver_id: s.driver_id,
+          car: s.car,
+          rawSchedule: s
+        }));
+
+      const myCrewsFromSchedules = myAssignments.map(a => a.crew);
+      const myCrewsFromBookings = allBookings
+        .filter((b: any) => (b.driver_name && b.driver_name === driver?.name) || (b.driver_id && b.driver_id === driver?.id))
+        .map((b: any) => normalizeCrewName(b.crew));
+
+      const myCrews = Array.from(new Set([...myCrewsFromSchedules, ...myCrewsFromBookings]));
       
       setAssignedCrews(myCrews);
 
       if (myCrews.length > 0) {
-        let activeCrew = selectedCrew;
+        let activeCrew = normalizeCrewName(selectedCrew);
         // Якщо обраний екіпаж не є серед призначених екіпажів, ставимо перший призначений
-        if (!myCrews.includes(selectedCrew)) {
+        if (!myCrews.includes(activeCrew)) {
           activeCrew = myCrews[0];
           setSelectedCrew(myCrews[0]);
         }
@@ -60,20 +234,29 @@ export default function DriverPanel({ driver, onLogout }: DriverPanelProps) {
         const grouped: Record<string, any> = {};
         
         activeBookings.forEach((booking: any) => {
-          const key = booking.departure_time;
+          const key = normalizeTime(booking.departure_time);
           if (!grouped[key]) {
+            const isLviv = getRunDirectionForTime(assignment?.rawSchedule, key);
             grouped[key] = {
               time: key,
-              route: `${booking.from || booking.bus_from} → ${booking.to || booking.bus_to}`,
-              passengers: []
+              route: isLviv ? 'Львів → Східниця' : 'Східниця → Львів',
+              bookings: [],
+              passengerCount: 0
             };
           }
-          grouped[key].passengers.push({
-            name: booking.passenger_name || booking.name,
-            phone: booking.passenger_phone || booking.phone,
-            seats: booking.seats,
-            pickup_location: booking.pickup_location
-          });
+          grouped[key].bookings.push(booking);
+          grouped[key].passengerCount += (booking.seats || 0);
+        });
+        
+        const carDetails = getCarDetails(assignment?.car || '');
+        const totalSeats = carDetails ? carDetails.seats : 12;
+
+        // Для кожного рейсу обчислюємо місця та резерв
+        Object.keys(grouped).forEach(timeKey => {
+          const isLviv = getRunDirectionForTime(assignment?.rawSchedule, timeKey);
+          const { seats, backupBookings } = allocateSeatSlots(grouped[timeKey].bookings, isLviv, totalSeats);
+          grouped[timeKey].seats = seats;
+          grouped[timeKey].backupBookings = backupBookings;
         });
         
         setRides(Object.values(grouped));
@@ -217,33 +400,138 @@ export default function DriverPanel({ driver, onLogout }: DriverPanelProps) {
                   </div>
                 </div>
                 <div className="text-xs uppercase font-black text-brand-muted bg-brand-dark/50 px-2 py-1 rounded">
-                  {ride.passengers.length} пас.
+                  {ride.passengerCount} пас.
                 </div>
               </div>
 
-              {/* Список пасажирів */}
-              <div className="p-4 space-y-4">
-                {ride.passengers.map((passenger: any, pIdx: number) => (
-                  <div key={pIdx} className="flex justify-between items-start gap-4 text-sm pb-4 border-b border-brand-border last:border-0 last:pb-0">
-                    <div className="space-y-1">
-                      <div className="font-bold text-white flex items-center gap-1">
-                        {passenger.name} 
-                        <span className="text-brand-yellow text-xs">({passenger.seats} місць)</span>
+              {/* Список пасажирів по місцях */}
+              <div className="p-4 space-y-3">
+                {ride.seats.filter((s: any) => s.bookings.length > 0).map((seat: any) => {
+                  return (
+                    <div key={`seat-${seat.number}`} className="bg-brand-surface/40 border border-brand-border/40 rounded-2xl overflow-hidden divide-y divide-brand-border/20">
+                      <div className="flex items-center gap-2 py-2 px-4 bg-brand-yellow/[0.03] border-b border-brand-border/30 text-xs font-bold text-brand-yellow">
+                        <span className="font-mono bg-brand-yellow/10 px-1.5 py-0.5 rounded text-[10px]">Місце {seat.number}</span>
                       </div>
-                      <div className="text-brand-muted flex items-center gap-1 text-xs">
-                        <MapPin size={12} />
-                        Посадка: {passenger.pickup_location || 'Не вказано'}
+                      <div className="p-4 space-y-4">
+                        {seat.bookings.map((b: any, bIdx: number) => {
+                          const fromId = getStopId(b.bus_from || b.from);
+                          const toId = getStopId(b.bus_to || b.to);
+                          return (
+                            <div key={`${b.id}-${bIdx}`} className="flex justify-between items-start gap-4 text-sm pb-4 last:pb-0 border-b border-brand-border/20 last:border-b-0">
+                              <div className="space-y-1.5">
+                                <div className="font-bold text-white flex items-center gap-1.5">
+                                  <span>{b.passenger_name || b.name}</span>
+                                  {b.totalSeats > 1 && (
+                                    <span className="text-[10px] text-brand-muted font-normal bg-brand-surface border border-brand-border px-1.5 py-0.5 rounded">
+                                      пас. {b.seatSubIndex}/{b.totalSeats}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-brand-muted text-xs flex flex-col gap-1.5">
+                                  <div className="flex items-center gap-1 text-white/95 font-semibold text-[11px]">
+                                    <span>{STOP_NAMES[fromId] || b.bus_from || b.from}</span>
+                                    <span className="text-brand-yellow px-1">→</span>
+                                    <span>{STOP_NAMES[toId] || b.bus_to || b.to}</span>
+                                  </div>
+                                  <div className="flex items-center gap-1.5 text-brand-muted">
+                                    <MapPin size={12} className="text-brand-yellow flex-shrink-0" />
+                                    <span>
+                                      Посадка: {b.pickup_location || 'Не вказано'}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-1.5 text-brand-muted mt-0.5">
+                                    <CreditCard size={12} className="text-brand-yellow flex-shrink-0" />
+                                    {(b.is_paid_online === 1 || (b.is_paid_online !== 0 && (b.updated_by === 'Клієнт' || !b.updated_by || b.updated_by === 'Client'))) ? (
+                                      <span className="text-emerald-400 font-bold px-1.5 py-0.5 bg-emerald-500/10 border border-emerald-500/20 rounded text-[10px] uppercase tracking-wide">
+                                        Оплачено
+                                      </span>
+                                    ) : (
+                                      <span>
+                                        Оплата:{' '}
+                                        <span className="text-white font-bold font-mono">
+                                          {b.price} грн{b.totalSeats > 1 ? ` (за ${b.totalSeats} міс.)` : ''}
+                                        </span>
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              <a 
+                                href={`tel:${b.passenger_phone || b.phone}`}
+                                className="bg-brand-yellow text-brand-dark p-3 rounded-full hover:scale-105 transition-transform shadow-brand flex-shrink-0"
+                              >
+                                <Phone size={15} />
+                              </a>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
-                    
-                    <a 
-                      href={`tel:${passenger.phone}`}
-                      className="bg-brand-yellow text-brand-dark p-3 rounded-full hover:scale-105 transition-transform shadow-brand flex-shrink-0"
-                    >
-                      <Phone size={16} />
-                    </a>
+                  );
+                })}
+
+                {/* Резервні місця */}
+                {ride.backupBookings.length > 0 && (
+                  <div className="mt-4 p-4 bg-red-950/20 border border-red-500/20 rounded-2xl space-y-3">
+                    <div className="flex justify-between items-center border-b border-red-500/10 pb-2">
+                      <h4 className="text-xs font-bold text-red-400 uppercase tracking-wider flex items-center gap-1.5">
+                        ⚠️ Резервні місця ({ride.backupBookings.reduce((sum: number, b: any) => sum + (b.seats || 0), 0)}м)
+                      </h4>
+                      <span className="text-[9px] text-red-400/80 italic">Поза 12 місцями</span>
+                    </div>
+                    <div className="space-y-4 divide-y divide-red-500/10">
+                      {ride.backupBookings.map((b: any, bIdx: number) => {
+                        const fromId = getStopId(b.bus_from || b.from);
+                        const toId = getStopId(b.bus_to || b.to);
+                        return (
+                          <div key={`${b.id}-${bIdx}`} className={`pt-3 first:pt-0 flex justify-between items-start gap-3 text-sm`}>
+                            <div className="space-y-1.5">
+                              <div className="font-bold text-white flex items-center gap-1.5">
+                                <span>{b.passenger_name || b.name}</span>
+                                <span className="text-[10px] text-red-400 bg-red-500/10 border border-red-500/20 px-1.5 py-0.5 rounded font-mono">
+                                  Резерв ({b.seats}м)
+                                </span>
+                              </div>
+                              <div className="text-brand-muted text-xs flex flex-col gap-1.5">
+                                <div className="flex items-center gap-1 text-white/95 font-semibold text-[11px]">
+                                  <span>{STOP_NAMES[fromId] || b.bus_from || b.from}</span>
+                                  <span className="text-brand-yellow px-1">→</span>
+                                  <span>{STOP_NAMES[toId] || b.bus_to || b.to}</span>
+                                </div>
+                                <div className="flex items-center gap-1.5 text-brand-muted">
+                                  <MapPin size={12} className="text-brand-yellow flex-shrink-0" />
+                                  <span>Посадка: {b.pickup_location || 'Не вказано'}</span>
+                                </div>
+                                <div className="flex items-center gap-1.5 text-brand-muted mt-0.5">
+                                  <CreditCard size={12} className="text-brand-yellow flex-shrink-0" />
+                                  {(b.is_paid_online === 1 || (b.is_paid_online !== 0 && (b.updated_by === 'Клієнт' || !b.updated_by || b.updated_by === 'Client'))) ? (
+                                    <span className="text-emerald-400 font-bold px-1.5 py-0.5 bg-emerald-500/10 border border-emerald-500/20 rounded text-[10px] uppercase tracking-wide">
+                                      Оплачено
+                                    </span>
+                                  ) : (
+                                    <span>
+                                      Оплата:{' '}
+                                      <span className="text-white font-bold font-mono">
+                                        {b.price} грн{b.seats > 1 ? ` (за ${b.seats} міс.)` : ''}
+                                      </span>
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <a 
+                              href={`tel:${b.passenger_phone || b.phone}`}
+                              className="bg-red-500 text-white p-3 rounded-full hover:scale-105 transition-transform shadow-lg flex-shrink-0"
+                            >
+                              <Phone size={15} />
+                            </a>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                ))}
+                )}
               </div>
             </motion.div>
           ))}

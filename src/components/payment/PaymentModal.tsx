@@ -199,9 +199,9 @@ export default function PaymentModal({ data, onClose, onOpenLegal }: PaymentModa
                   </button>
 
                   <div className="flex items-center justify-center gap-4 py-2 opacity-50">
-                    <img src="https://upload.wikimedia.org/wikipedia/commons/d/d6/Visa_2021.svg" alt="Visa" className="h-4" />
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/5/5c/Visa_Inc._logo_(2021–present).svg" alt="Visa" className="h-4" />
                     <img src="https://upload.wikimedia.org/wikipedia/commons/2/2a/Mastercard-logo.svg" alt="Mastercard" className="h-4" />
-                    <img src="https://www.portmone.com.ua/r3/images/logo.svg" alt="Portmone" className="h-4" />
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/c/c4/Portmone_logo.svg" alt="Portmone" className="h-4" />
                   </div>
                 </div>
 

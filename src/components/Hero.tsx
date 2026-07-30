@@ -6,10 +6,13 @@ import { useState } from 'react';
 
 interface HeroProps {
   onBookNow: () => void;
+  directionIndex: number | null;
+  setDirectionIndex: (dir: number | null) => void;
 }
 
-export default function Hero({ onBookNow }: HeroProps) {
+export default function Hero({ onBookNow, directionIndex, setDirectionIndex }: HeroProps) {
   const [isHovered, setIsHovered] = useState(false);
+  const [arrowRotation, setArrowRotation] = useState(0);
   const comfortFeatures = [
     { icon: Bus, label: 'Mercedes Sprinter & Volkswagen Crafter', desc: 'Сучасний таксопарк' },
     { icon: Thermometer, label: 'Клімат-контроль', desc: 'Кондиціонери та додаткові обігрівачі' },
@@ -74,22 +77,63 @@ export default function Hero({ onBookNow }: HeroProps) {
             onMouseLeave={() => setIsHovered(false)}
             onClick={() => setIsHovered(!isHovered)}
           >
-            <h1 className="font-display font-bold text-4xl md:text-6xl text-white leading-tight flex items-center justify-center gap-3 md:gap-4 transition-transform duration-300">
-              <span className="relative z-10 bg-brand-dark px-1">Львів</span>
-              <div className="relative flex items-center justify-center">
-                <ArrowLeftRight size={32} className={`text-brand-yellow transition-all duration-300 ${isHovered ? 'opacity-0 scale-50' : 'opacity-100 scale-100'}`} />
-                <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-0.5 bg-brand-yellow transition-all duration-300 ease-out ${isHovered ? 'w-32 md:w-48 opacity-50' : 'w-0 opacity-0'}`} />
-              </div>
-              <span className="relative z-10 bg-brand-dark px-1">Східниця</span>
-            </h1>
+            <motion.h1 
+              layout 
+              className="font-display font-bold text-4xl md:text-6xl text-white leading-tight flex items-center justify-center gap-3 md:gap-4"
+            >
+              <motion.span 
+                layout 
+                style={{ order: (directionIndex === 1) ? 3 : 1 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+                className="relative z-10 bg-brand-dark px-1 inline-block"
+              >
+                Львів
+              </motion.span>
+              <motion.div 
+                layout 
+                style={{ order: 2 }}
+                className="relative flex items-center justify-center cursor-pointer p-2.5 rounded-full bg-brand-surface/20 border border-brand-border/40 hover:bg-brand-yellow/10 hover:border-brand-yellow/40 hover:shadow-[0_0_25px_rgba(245,158,11,0.25)] transition-all duration-300"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDirectionIndex(directionIndex === 1 ? 0 : 1);
+                  setArrowRotation(r => r + 180);
+                }}
+                animate={{ rotate: arrowRotation }}
+                whileHover={{ scale: 1.15 }}
+                whileTap={{ scale: 0.92 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+              >
+                <ArrowLeftRight size={32} className="text-brand-yellow" />
+              </motion.div>
+              <motion.span 
+                layout 
+                style={{ order: (directionIndex === 1) ? 1 : 3 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+                className="relative z-10 bg-brand-dark px-1 inline-block"
+              >
+                Східниця
+              </motion.span>
+            </motion.h1>
             
             <div className="absolute -bottom-8 w-full flex justify-center">
               <div className={`transition-all duration-300 ease-out flex items-center justify-center gap-2 md:gap-4 text-xs md:text-sm font-semibold tracking-wide uppercase text-white/80 ${isHovered ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4 pointer-events-none'}`}>
-                <span className="shrink-0 text-brand-yellow">Стебник</span>
-                <span className="w-1 h-1 rounded-full bg-brand-muted shrink-0" />
-                <span className="shrink-0 text-brand-yellow">Трускавець</span>
-                <span className="w-1 h-1 rounded-full bg-brand-muted shrink-0" />
-                <span className="shrink-0 text-brand-yellow">Борислав</span>
+                {directionIndex === 1 ? (
+                  <>
+                    <span className="shrink-0 text-brand-yellow">Борислав</span>
+                    <span className="w-1 h-1 rounded-full bg-brand-muted shrink-0" />
+                    <span className="shrink-0 text-brand-yellow">Трускавець</span>
+                    <span className="w-1 h-1 rounded-full bg-brand-muted shrink-0" />
+                    <span className="shrink-0 text-brand-yellow">Стебник</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="shrink-0 text-brand-yellow">Стебник</span>
+                    <span className="w-1 h-1 rounded-full bg-brand-muted shrink-0" />
+                    <span className="shrink-0 text-brand-yellow">Трускавець</span>
+                    <span className="w-1 h-1 rounded-full bg-brand-muted shrink-0" />
+                    <span className="shrink-0 text-brand-yellow">Борислав</span>
+                  </>
+                )}
               </div>
             </div>
           </div>

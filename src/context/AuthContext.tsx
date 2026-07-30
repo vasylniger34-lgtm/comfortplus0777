@@ -29,6 +29,7 @@ interface AuthContextType {
   addBooking: (booking: BookingData) => Promise<BookingRecord | null>;
   cancelBooking: (id: string) => Promise<void>;
   updateBalance: (amount: number) => Promise<void>;
+  reloadBookings: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -230,6 +231,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const reloadBookings = async () => {
+    const activeUserId = localStorage.getItem('comfort_active_user_id') || (user ? user.id : null);
+    if (activeUserId) {
+      await loadBookings(activeUserId);
+    }
+  };
+
   return (
     <AuthContext.Provider value={{ 
       user, 
@@ -240,7 +248,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       logout, 
       addBooking, 
       cancelBooking, 
-      updateBalance 
+      updateBalance,
+      reloadBookings
     }}>
       {children}
     </AuthContext.Provider>
